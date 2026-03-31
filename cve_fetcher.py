@@ -117,10 +117,11 @@ class CVEFetcher:
 
     def fetch_recent_nvd_cves(self, hours: int = 24) -> list[dict[str, Any]]:
         """Hamta nyligen publicerade/uppdaterade CVEer fran NVD."""
+        now_utc = datetime.now(tz=timezone.utc)
+        start_utc = now_utc - timedelta(hours=hours)
         params = {
-            "pubStartDate": (
-                datetime.now(tz=timezone.utc) - timedelta(hours=hours)
-            ).isoformat(timespec="seconds"),
+            "pubStartDate": start_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "pubEndDate": now_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
             "resultsPerPage": 200,
         }
         try:
