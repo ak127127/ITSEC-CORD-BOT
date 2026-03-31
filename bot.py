@@ -20,10 +20,10 @@ logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
-logger = logging.getLogger("nemoclaw")
+logger = logging.getLogger("itsec")
 
 
-class NemoClawBot(commands.Bot):
+class ItSecCordBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         super().__init__(command_prefix="!", intents=intents)
@@ -68,7 +68,7 @@ class NemoClawBot(commands.Bot):
 
         await self.run_cve_cycle()
         await self.run_news_cycle()
-        await self.log_message("NemoClaw ar online och bevakning ar aktiv.")
+        await self.log_message("ITSEC-CORD-BOT ar online och bevakning ar aktiv.")
 
     async def close(self):
         if self.scheduler:
@@ -83,9 +83,9 @@ class NemoClawBot(commands.Bot):
         return self.guilds[0] if self.guilds else None
 
     async def _ensure_channel_structure(self, guild: discord.Guild):
-        category = discord.utils.get(guild.categories, name="NEMOCLAW")
+        category = discord.utils.get(guild.categories, name="ITSEC-CORD-BOT")
         if not category:
-            category = await guild.create_category("NEMOCLAW")
+            category = await guild.create_category("ITSEC-CORD-BOT")
 
         for key, channel_name in DEFAULT_CHANNELS.items():
             channel = discord.utils.get(guild.text_channels, name=channel_name)
@@ -99,7 +99,7 @@ class NemoClawBot(commands.Bot):
         logger.info(message)
         log_channel = self.channel_map.get("log")
         if log_channel:
-            await log_channel.send(f"`[NemoClaw]` {message}")
+            await log_channel.send(f"`[ITSEC]` {message}")
 
     @staticmethod
     def _severity_emoji(severity: str) -> str:
@@ -269,7 +269,7 @@ class NemoClawBot(commands.Bot):
         uptime = datetime.now(tz=TZ_STOCKHOLM) - self.started_at
 
         return (
-            "**NemoClaw Status**\n"
+            "**ITSEC-CORD-BOT Status**\n"
             f"- Uptime: `{str(uptime).split('.')[0]}`\n"
             f"- Senaste CVE-fetch: `{cve_last or 'aldrig'}`\n"
             f"- Senaste KEV-fetch: `{kev_last or 'aldrig'}`\n"
@@ -280,7 +280,7 @@ class NemoClawBot(commands.Bot):
 
 def main():
     token = get_setting("DISCORD_TOKEN")
-    bot = NemoClawBot()
+    bot = ItSecCordBot()
     bot.run(token)
 
 

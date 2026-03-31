@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 
-class NemoClawCommands(commands.GroupCog, group_name="nemoclaw", group_description="CVE och omvarldsbevakning"):
+class ItSecCommands(commands.GroupCog, group_name="itsec", group_description="CVE och omvarldsbevakning"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -88,4 +88,4 @@ class NemoClawCommands(commands.GroupCog, group_name="nemoclaw", group_descripti
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(NemoClawCommands(bot))
+    await bot.add_cog(ItSecCommands(bot))

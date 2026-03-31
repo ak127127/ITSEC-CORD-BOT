@@ -9,18 +9,18 @@ class GeneralCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="nemoclaw_help", description="Visa snabb hjalp for NemoClaw")
-    async def nemoclaw_help(self, interaction: discord.Interaction):
+    @app_commands.command(name="itsec_help", description="Visa snabb hjalp for ITSEC-CORD-BOT")
+    async def itsec_help(self, interaction: discord.Interaction):
         text = (
-            "**NemoClaw kommandon**\n"
-            "- `/nemoclaw cve CVE-YYYY-NNNN`\n"
-            "- `/nemoclaw latest [antal]`\n"
-            "- `/nemoclaw search [sokterm]`\n"
-            "- `/nemoclaw watch [vendor]`\n"
-            "- `/nemoclaw unwatch [vendor]`\n"
-            "- `/nemoclaw mysubs`\n"
-            "- `/nemoclaw weekly`\n"
-            "- `/nemoclaw status`"
+            "**ITSEC-CORD-BOT kommandon**\n"
+            "- `/itsec cve CVE-YYYY-NNNN`\n"
+            "- `/itsec latest [antal]`\n"
+            "- `/itsec search [sokterm]`\n"
+            "- `/itsec watch [vendor]`\n"
+            "- `/itsec unwatch [vendor]`\n"
+            "- `/itsec mysubs`\n"
+            "- `/itsec weekly`\n"
+            "- `/itsec status`"
         )
         await interaction.response.send_message(text, ephemeral=True)
 

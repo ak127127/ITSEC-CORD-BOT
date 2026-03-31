@@ -10,7 +10,7 @@ from config import get_setting
 
 class Database:
     def __init__(self):
-        self.db_path = get_setting("DB_PATH", "nemoclaw.db")
+        self.db_path = get_setting("DB_PATH", "itsec_cord_bot.db")
         self.connection: Optional[aiosqlite.Connection] = None
 
     async def connect(self):

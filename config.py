@@ -13,8 +13,8 @@ DEFAULT_CHANNELS = {
     "high": "cve-hog",
     "news": "sakerhetsnyheter",
     "weekly": "veckosammanfattning",
-    "log": "nemoclaw-logg",
-    "ask": "fraga-nemoclaw",
+    "log": "itsec-logg",
+    "ask": "fraga-itsec",
 }
 
 NEWS_FEEDS = [

@@ -1,1 +1,1 @@
-"""Cog package for NemoClaw commands."""
+"""Cog package for ITSEC commands."""
