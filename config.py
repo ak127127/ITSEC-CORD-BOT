@@ -5,8 +5,18 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
-# Ladda .env-fil om den finns.
+# Load .env file if present.
 load_dotenv()
+
+
+def _env_bool(key: str, default: bool) -> bool:
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+ENABLE_CERT_SE = _env_bool("ENABLE_CERT_SE", True)
 
 TZ_STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
@@ -14,7 +24,6 @@ DEFAULT_CHANNELS = {
     "critical": "cve-critical",
     "high": "cve-high",
     "news": "security-news",
-    "cert_se": "cert-se-alerts",
     "vendor_microsoft": "vendor-microsoft",
     "vendor_linux": "vendor-linux",
     "vendor_google": "vendor-google",
@@ -35,6 +44,9 @@ DEFAULT_CHANNELS = {
     "log": "itsec-log",
     "ask": "ask-itsec",
 }
+
+if ENABLE_CERT_SE:
+    DEFAULT_CHANNELS["cert_se"] = "cert-se-alerts"
 
 NEWS_VENDOR_MATCHERS = {
     "vendor_microsoft": {
@@ -138,13 +150,15 @@ NEWS_FEEDS = [
     "https://www.bleepingcomputer.com/feed/",
     "https://therecord.media/feed",
     "https://krebsonsecurity.com/feed/",
-    "https://www.cert.se/feed/",
     "https://www.cisa.gov/cybersecurity-advisories/all.xml",
     "https://isc.sans.edu/rssfeed.xml",
     "https://googleprojectzero.blogspot.com/feeds/posts/default?alt=rss",
     "https://msrc.microsoft.com/blog/feed",
     "https://www.rapid7.com/blog/rss/",
 ]
+
+if ENABLE_CERT_SE:
+    NEWS_FEEDS.append("https://www.cert.se/feed/")
 
 BROAD_IMPACT_KEYWORDS = {
     "microsoft",

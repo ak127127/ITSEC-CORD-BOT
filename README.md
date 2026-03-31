@@ -36,6 +36,7 @@ Update `.env`:
 ```dotenv
 DISCORD_TOKEN=your_discord_token_here
 GUILD_ID=
+ENABLE_CERT_SE=true
 NVD_API_KEY=your_nvd_api_key_here
 LOG_LEVEL=INFO
 DB_PATH=itsec_cord_bot.db
@@ -164,6 +165,10 @@ News routing behavior:
 - Every news item is always posted in `security-news`.
 - CERT-SE items are also posted in `cert-se-alerts`.
 - Major-vendor items are duplicated into their vendor channels.
+
+CERT-SE opt-out:
+
+- Set `ENABLE_CERT_SE=false` in `.env` to disable CERT-SE feed ingestion and CERT-SE channel creation.
 
 Major-vendor channels currently include:
 
