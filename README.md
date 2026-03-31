@@ -8,6 +8,8 @@ ITSEC-CORD-BOT is a Discord security monitoring bot that tracks CVEs, CISA KEV e
 - Enriches CVEs with CISA KEV data
 - Posts alerts to Discord channels
 - Pulls security news from RSS feeds
+- Duplicates major-vendor news into dedicated vendor channels
+- Routes CERT-SE posts to a dedicated CERT-SE channel
 - Generates weekly summaries
 - Provides slash commands for lookup, status, and subscriptions
 
@@ -162,6 +164,29 @@ News routing behavior:
 - Every news item is always posted in `security-news`.
 - CERT-SE items are also posted in `cert-se-alerts`.
 - Major-vendor items are duplicated into their vendor channels.
+
+Major-vendor channels currently include:
+
+- `vendor-microsoft`
+- `vendor-linux`
+- `vendor-google`
+- `vendor-cisco`
+- `vendor-fortinet`
+- `vendor-vmware`
+
+## News Sources
+
+Configured RSS/Atom feeds:
+
+- `https://www.bleepingcomputer.com/feed/`
+- `https://therecord.media/feed`
+- `https://krebsonsecurity.com/feed/`
+- `https://www.cert.se/feed/`
+- `https://www.cisa.gov/cybersecurity-advisories/all.xml`
+- `https://isc.sans.edu/rssfeed.xml`
+- `https://googleprojectzero.blogspot.com/feeds/posts/default?alt=rss`
+- `https://msrc.microsoft.com/blog/feed`
+- `https://www.rapid7.com/blog/rss/`
 
 ## Security Notes
 
