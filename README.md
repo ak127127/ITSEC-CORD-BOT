@@ -143,12 +143,12 @@ In Discord Developer Portal:
 
 On startup (when a guild is resolved), the bot creates or uses channels under one category:
 
-- `cve-kritisk`
-- `cve-hog`
-- `sakerhetsnyheter`
-- `veckosammanfattning`
-- `itsec-logg`
-- `fraga-itsec`
+- `cve-critical`
+- `cve-high`
+- `security-news`
+- `weekly-summary`
+- `itsec-log`
+- `ask-itsec`
 
 ## Security Notes
 
