@@ -24,6 +24,11 @@ NEWS_FEEDS = [
     "https://therecord.media/feed",
     "https://krebsonsecurity.com/feed/",
     "https://www.cert.se/feed/",
+    "https://www.cisa.gov/cybersecurity-advisories/all.xml",
+    "https://isc.sans.edu/rssfeed.xml",
+    "https://googleprojectzero.blogspot.com/feeds/posts/default?alt=rss",
+    "https://msrc.microsoft.com/blog/feed",
+    "https://www.rapid7.com/blog/rss/",
 ]
 
 BROAD_IMPACT_KEYWORDS = {
