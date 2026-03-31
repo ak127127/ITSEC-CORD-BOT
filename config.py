@@ -18,9 +18,19 @@ DEFAULT_CHANNELS = {
     "vendor_microsoft": "vendor-microsoft",
     "vendor_linux": "vendor-linux",
     "vendor_google": "vendor-google",
+    "vendor_apple": "vendor-apple",
     "vendor_cisco": "vendor-cisco",
     "vendor_fortinet": "vendor-fortinet",
     "vendor_vmware": "vendor-vmware",
+    "vendor_oracle": "vendor-oracle",
+    "vendor_adobe": "vendor-adobe",
+    "vendor_apache": "vendor-apache",
+    "vendor_nginx": "vendor-nginx",
+    "vendor_openssl": "vendor-openssl",
+    "vendor_docker": "vendor-docker",
+    "vendor_kubernetes": "vendor-kubernetes",
+    "vendor_postgresql": "vendor-postgresql",
+    "vendor_mysql": "vendor-mysql",
     "weekly": "weekly-summary",
     "log": "itsec-log",
     "ask": "ask-itsec",
@@ -53,6 +63,14 @@ NEWS_VENDOR_MATCHERS = {
         "chromium",
         "gcp",
     },
+    "vendor_apple": {
+        "apple",
+        "ios",
+        "macos",
+        "iphone",
+        "ipad",
+        "safari",
+    },
     "vendor_cisco": {
         "cisco",
         "catalyst",
@@ -72,6 +90,47 @@ NEWS_VENDOR_MATCHERS = {
         "esxi",
         "vcenter",
         "vsphere",
+    },
+    "vendor_oracle": {
+        "oracle",
+        "weblogic",
+        "identity manager",
+        "java",
+    },
+    "vendor_adobe": {
+        "adobe",
+        "acrobat",
+        "reader",
+        "photoshop",
+        "illustrator",
+    },
+    "vendor_apache": {
+        "apache",
+        "http server",
+        "tomcat",
+        "struts",
+    },
+    "vendor_nginx": {
+        "nginx",
+    },
+    "vendor_openssl": {
+        "openssl",
+    },
+    "vendor_docker": {
+        "docker",
+        "containerd",
+    },
+    "vendor_kubernetes": {
+        "kubernetes",
+        "k8s",
+    },
+    "vendor_postgresql": {
+        "postgresql",
+        "postgres",
+    },
+    "vendor_mysql": {
+        "mysql",
+        "mariadb",
     },
 }
 

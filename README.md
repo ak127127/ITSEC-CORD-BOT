@@ -170,9 +170,19 @@ Major-vendor channels currently include:
 - `vendor-microsoft`
 - `vendor-linux`
 - `vendor-google`
+- `vendor-apple`
 - `vendor-cisco`
 - `vendor-fortinet`
 - `vendor-vmware`
+- `vendor-oracle`
+- `vendor-adobe`
+- `vendor-apache`
+- `vendor-nginx`
+- `vendor-openssl`
+- `vendor-docker`
+- `vendor-kubernetes`
+- `vendor-postgresql`
+- `vendor-mysql`
 
 ## News Sources
 
