@@ -146,6 +146,7 @@ On startup (when a guild is resolved), the bot creates or uses channels under on
 - `cve-critical`
 - `cve-high`
 - `security-news`
+- `cert-se-alerts`
 - `weekly-summary`
 - `itsec-log`
 - `ask-itsec`

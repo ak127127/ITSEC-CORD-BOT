@@ -211,6 +211,7 @@ class ItSecCordBot(commands.Bot):
 
         sent_count = 0
         news_channel = self.channel_map.get("news")
+        cert_se_channel = self.channel_map.get("cert_se")
         for item in items:
             inserted = await self.db.mark_news_as_published(
                 item_url=item["url"],
@@ -221,8 +222,14 @@ class ItSecCordBot(commands.Bot):
             if not inserted:
                 continue
             sent_count += 1
-            if news_channel:
-                await news_channel.send(self.format_news_alert(item))
+
+            target_channel = news_channel
+            source_name = (item.get("source_name") or "").lower()
+            if "cert-se" in source_name or "cert se" in source_name:
+                target_channel = cert_se_channel or news_channel
+
+            if target_channel:
+                await target_channel.send(self.format_news_alert(item))
 
         await self.db.set_last_fetch("news")
         if sent_count:

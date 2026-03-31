@@ -14,6 +14,7 @@ DEFAULT_CHANNELS = {
     "critical": "cve-critical",
     "high": "cve-high",
     "news": "security-news",
+    "cert_se": "cert-se-alerts",
     "weekly": "weekly-summary",
     "log": "itsec-log",
     "ask": "ask-itsec",
