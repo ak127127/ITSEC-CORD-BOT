@@ -53,7 +53,7 @@ class NewsFetcher:
         return "news"
 
     def fetch_recent_news(self, hours: int = 30) -> list[dict[str, str]]:
-        """Hamta nyheter fran RSS-floden."""
+        """Fetch news from RSS feeds."""
         collected: list[dict[str, str]] = []
         cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=hours)
 
@@ -61,7 +61,7 @@ class NewsFetcher:
             try:
                 parsed = feedparser.parse(feed_url)
             except Exception as exc:
-                logger.exception("Fel vid RSS-hamtning %s: %s", feed_url, exc)
+                logger.exception("Error fetching RSS feed %s: %s", feed_url, exc)
                 continue
 
             source_title = parsed.feed.get("title", feed_url)

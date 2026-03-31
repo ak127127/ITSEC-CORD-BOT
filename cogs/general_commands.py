@@ -9,13 +9,13 @@ class GeneralCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="itsec_help", description="Visa snabb hjalp for ITSEC-CORD-BOT")
+    @app_commands.command(name="itsec_help", description="Show quick help for ITSEC-CORD-BOT")
     async def itsec_help(self, interaction: discord.Interaction):
         text = (
-            "**ITSEC-CORD-BOT kommandon**\n"
+            "**ITSEC-CORD-BOT commands**\n"
             "- `/itsec cve CVE-YYYY-NNNN`\n"
-            "- `/itsec latest [antal]`\n"
-            "- `/itsec search [sokterm]`\n"
+            "- `/itsec latest [count]`\n"
+            "- `/itsec search [term]`\n"
             "- `/itsec watch [vendor]`\n"
             "- `/itsec unwatch [vendor]`\n"
             "- `/itsec mysubs`\n"

@@ -47,17 +47,17 @@ class ItSecCordBot(commands.Bot):
             return
         self.is_initialized = True
 
-        logger.info("Inloggad som %s (%s)", self.user, self.user.id if self.user else "n/a")
+        logger.info("Logged in as %s (%s)", self.user, self.user.id if self.user else "n/a")
         guild = self._resolve_guild()
         if guild:
             await self._ensure_channel_structure(guild)
 
         if guild:
             synced = await self.tree.sync(guild=guild)
-            logger.info("Synkade %d guild-kommandon", len(synced))
+            logger.info("Synced %d guild commands", len(synced))
         else:
             synced = await self.tree.sync()
-            logger.info("Synkade %d globala kommandon", len(synced))
+            logger.info("Synced %d global commands", len(synced))
 
         self.scheduler = BotScheduler(
             cve_job=self.run_cve_cycle,
@@ -68,7 +68,7 @@ class ItSecCordBot(commands.Bot):
 
         await self.run_cve_cycle()
         await self.run_news_cycle()
-        await self.log_message("ITSEC-CORD-BOT ar online och bevakning ar aktiv.")
+        await self.log_message("ITSEC-CORD-BOT is online and monitoring is active.")
 
     async def close(self):
         if self.scheduler:
@@ -126,11 +126,11 @@ class ItSecCordBot(commands.Bot):
         title = cve.get("title", cve_id)
         short_title = title.replace(f"{cve_id} - ", "").strip()
         cvss = float(cve.get("cvss", 0.0))
-        exploit = cve.get("exploit_status", "Ingen")
-        kev = "Ja" if cve.get("is_kev") else "Nej"
-        affected = cve.get("affected", "Okant")
-        summary = cve.get("summary", "Ingen sammanfattning tillganglig.")
-        action = cve.get("action", "Patcha till senaste tillgangliga version.")
+        exploit = cve.get("exploit_status", "None")
+        kev = "Yes" if cve.get("is_kev") else "No"
+        affected = cve.get("affected", "Unknown")
+        summary = cve.get("summary", "No summary available.")
+        action = cve.get("action", "Patch to the latest available version.")
         nvd_url = cve.get("url") or f"https://nvd.nist.gov/vuln/detail/{cve_id}"
         vendor_url = cve.get("vendor_url") or nvd_url
         exploit_url = cve.get("exploit_url")
@@ -142,9 +142,9 @@ class ItSecCordBot(commands.Bot):
         return (
             f"{emoji} **{cve_id} - {short_title}**\n"
             f"CVSS: {cvss:.1f} | Exploit: {exploit} | CISA KEV: {kev}\n\n"
-            f"**Paverkar:** {affected}\n"
-            f"**Sammanfattning:** {summary[:400]}\n\n"
-            f"**Atgard:** {action}\n"
+            f"**Affects:** {affected}\n"
+            f"**Summary:** {summary[:400]}\n\n"
+            f"**Action:** {action}\n"
             f"{links}"
         )
 
@@ -156,20 +156,20 @@ class ItSecCordBot(commands.Bot):
         summary = summary[:420] + ("..." if len(summary) > 420 else "")
         source_url = item.get("url", "")
 
-        action_line = "Kolla exponering i er miljo och triagera direkt om ni traffar." if item.get("category") in {
+        action_line = "Check your exposure and triage immediately if affected." if item.get("category") in {
             "threat_intel",
             "news",
-        } else "Bedom relevans for era compliance- och hardeningfloden."
+        } else "Assess relevance for your compliance and hardening workflows."
 
         return (
             f"{emoji} **{title}**\n"
             f"{summary}\n\n"
             f"{action_line}\n"
-            f"📎 [Kalla]({source_url})"
+            f"📎 [Source]({source_url})"
         )
 
     async def run_cve_cycle(self):
-        logger.info("Startar CVE/KEV-cykel")
+        logger.info("Starting CVE/KEV cycle")
         cves = await asyncio.to_thread(self.cve_fetcher.fetch_recent_nvd_cves, 24)
         kev_ids = await asyncio.to_thread(self.cve_fetcher.fetch_cisa_kev_set)
         cves = self.cve_fetcher.merge_with_kev(cves, kev_ids)
@@ -188,9 +188,9 @@ class ItSecCordBot(commands.Bot):
             channel = self.channel_map.get(channel_key)
             if channel:
                 should_ping_here = (
-                    cve.get("exploit_status") == "Aktiv"
+                    cve.get("exploit_status") == "Active"
                     and cve.get("is_broad_impact")
-                    and "ingen workaround" in (cve.get("summary", "").lower() + cve.get("action", "").lower())
+                    and "no workaround" in (cve.get("summary", "").lower() + cve.get("action", "").lower())
                 )
                 if should_ping_here and channel_key == "critical":
                     await channel.send("@here")
@@ -203,10 +203,10 @@ class ItSecCordBot(commands.Bot):
         await self.db.set_last_fetch("cve")
         await self.db.set_last_fetch("kev")
         if sent_count:
-            await self.log_message(f"CVE-cykel klar. Nya alerts: {sent_count}")
+            await self.log_message(f"CVE cycle complete. New alerts: {sent_count}")
 
     async def run_news_cycle(self):
-        logger.info("Startar nyhetscykel")
+        logger.info("Starting news cycle")
         items = await asyncio.to_thread(self.news_fetcher.fetch_recent_news, 30)
 
         sent_count = 0
@@ -226,30 +226,30 @@ class ItSecCordBot(commands.Bot):
 
         await self.db.set_last_fetch("news")
         if sent_count:
-            await self.log_message(f"Nyhetscykel klar. Nya poster: {sent_count}")
+            await self.log_message(f"News cycle complete. New posts: {sent_count}")
 
     async def generate_weekly_summary_text(self) -> str:
         stats = await self.db.get_weekly_stats()
         headlines = await self.db.get_weekly_news_headlines(limit=3)
 
-        trend = "Lugn vecka. Relativt sett."
+        trend = "Calm week overall."
         if stats["critical_count"] >= 5 or stats["active_exploit_count"] >= 2:
-            trend = "Hog aktivitet, framfor allt pa exploaterbarhetsfronten."
+            trend = "High activity, especially in exploitability risk."
 
         lines = [
-            "📋 **Veckosammanfattning**",
-            f"- Kritiska CVE:er: {stats['critical_count']}",
-            f"- Hoga CVE:er: {stats['high_count']}",
-            f"- Aktiva exploits: {stats['active_exploit_count']}",
-            f"- Nya CISA KEV-poster: {stats['kev_count']}",
-            "- Noterbara nyheter:",
+            "📋 **Weekly Summary**",
+            f"- Critical CVEs: {stats['critical_count']}",
+            f"- High CVEs: {stats['high_count']}",
+            f"- Active exploits: {stats['active_exploit_count']}",
+            f"- New CISA KEV entries: {stats['kev_count']}",
+            "- Notable news:",
         ]
 
         if headlines:
             for item in headlines:
                 lines.append(f"  - {item['title']} ({item['source_name']})")
         else:
-            lines.append("  - Inga tydliga stickare i nyhetsflodet den har veckan.")
+            lines.append("  - No standout headlines in the news feed this week.")
 
         lines.append(f"- Trend: {trend}")
         return "\n".join(lines)
@@ -271,10 +271,10 @@ class ItSecCordBot(commands.Bot):
         return (
             "**ITSEC-CORD-BOT Status**\n"
             f"- Uptime: `{str(uptime).split('.')[0]}`\n"
-            f"- Senaste CVE-fetch: `{cve_last or 'aldrig'}`\n"
-            f"- Senaste KEV-fetch: `{kev_last or 'aldrig'}`\n"
-            f"- Senaste nyhetsfetch: `{news_last or 'aldrig'}`\n"
-            f"- Senaste weekly: `{weekly_last or 'aldrig'}`"
+            f"- Last CVE fetch: `{cve_last or 'never'}`\n"
+            f"- Last KEV fetch: `{kev_last or 'never'}`\n"
+            f"- Last news fetch: `{news_last or 'never'}`\n"
+            f"- Last weekly summary: `{weekly_last or 'never'}`"
         )
 
 

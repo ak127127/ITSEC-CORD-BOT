@@ -11,12 +11,12 @@ load_dotenv()
 TZ_STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
 DEFAULT_CHANNELS = {
-    "critical": "cve-kritisk",
-    "high": "cve-hog",
-    "news": "sakerhetsnyheter",
-    "weekly": "veckosammanfattning",
-    "log": "itsec-logg",
-    "ask": "fraga-itsec",
+    "critical": "cve-critical",
+    "high": "cve-high",
+    "news": "security-news",
+    "weekly": "weekly-summary",
+    "log": "itsec-log",
+    "ask": "ask-itsec",
 }
 
 NEWS_FEEDS = [

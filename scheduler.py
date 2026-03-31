@@ -59,7 +59,7 @@ class BotScheduler:
             coalesce=True,
         )
         self.scheduler.start()
-        logger.info("Scheduler startad med CVE/KEV/nyhets/weekly-jobb")
+        logger.info("Scheduler started with CVE/KEV/news/weekly jobs")
 
     def shutdown(self):
         if self.scheduler.running:

@@ -48,7 +48,7 @@ class CVEFetcher:
             if desc.get("lang") == "en":
                 return desc.get("value", "")
         descriptions = cve.get("descriptions", [])
-        return descriptions[0].get("value", "") if descriptions else "Ingen beskrivning tillganglig."
+        return descriptions[0].get("value", "") if descriptions else "No description available."
 
     @staticmethod
     def _extract_cvss(cve: dict[str, Any]) -> float:
@@ -84,7 +84,7 @@ class CVEFetcher:
                         cpes.append(criteria)
                     if len(cpes) >= 3:
                         return ", ".join(cpes)
-        return ", ".join(cpes) if cpes else "Se vendor advisory for exakt scope"
+        return ", ".join(cpes) if cpes else "See vendor advisory for exact scope"
 
     @staticmethod
     def _extract_references(cve: dict[str, Any]) -> list[str]:
@@ -114,14 +114,14 @@ class CVEFetcher:
     @staticmethod
     def _exploit_status(reference_urls: list[str], is_kev: bool) -> str:
         if is_kev:
-            return "Aktiv"
+            return "Active"
         blob = " ".join(reference_urls).lower()
         if any(token in blob for token in ["exploit-db", "metasploit", "poc", "github.com"]):
             return "PoC"
-        return "Ingen"
+        return "None"
 
     def fetch_recent_nvd_cves(self, hours: int = 24) -> list[dict[str, Any]]:
-        """Hamta nyligen publicerade/uppdaterade CVEer fran NVD."""
+        """Fetch recently published/updated CVEs from NVD."""
         now_utc = datetime.now(tz=timezone.utc)
         start_utc = now_utc - timedelta(hours=hours)
         params = {
@@ -134,7 +134,7 @@ class CVEFetcher:
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
-            logger.exception("Fel vid hamtning av NVD-data: %s", exc)
+            logger.exception("Error fetching NVD data: %s", exc)
             return []
 
         parsed: list[dict[str, Any]] = []
@@ -172,7 +172,7 @@ class CVEFetcher:
             "is_kev": False,
             "exploit_status": self._exploit_status(refs, False),
             "affected": affected,
-            "action": "Patcha till senaste vendor-rekommenderade version.",
+            "action": "Patch to the latest vendor-recommended version.",
             "url": f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
             "vendor_url": refs[0] if refs else f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
             "exploit_url": refs[0] if refs else None,
@@ -181,7 +181,7 @@ class CVEFetcher:
         }
 
     def fetch_cve_by_id(self, cve_id: str) -> dict[str, Any] | None:
-        """Hamta en enskild CVE fran NVD via CVE-ID."""
+        """Fetch a single CVE from NVD using CVE ID."""
         cve_id = cve_id.upper().strip()
         try:
             response = self.session.get(
@@ -192,7 +192,7 @@ class CVEFetcher:
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
-            logger.exception("Fel vid hamtning av CVE %s: %s", cve_id, exc)
+            logger.exception("Error fetching CVE %s: %s", cve_id, exc)
             return None
 
         vulns = payload.get("vulnerabilities", [])
@@ -202,13 +202,13 @@ class CVEFetcher:
         return self._parse_nvd_item(vulns[0])
 
     def fetch_cisa_kev_set(self) -> set[str]:
-        """Hamta CISA KEV-listan som set med CVE-ID."""
+        """Fetch CISA KEV list as a set of CVE IDs."""
         try:
             response = self.session.get(CISA_KEV_URL, timeout=30)
             response.raise_for_status()
             payload = response.json()
         except Exception as exc:
-            logger.exception("Fel vid hamtning av CISA KEV: %s", exc)
+            logger.exception("Error fetching CISA KEV: %s", exc)
             return set()
 
         kev_ids: set[str] = set()
@@ -222,7 +222,7 @@ class CVEFetcher:
         for cve in cves:
             if cve["cve_id"] in kev_ids:
                 cve["is_kev"] = True
-                cve["exploit_status"] = "Aktiv"
+                cve["exploit_status"] = "Active"
         return cves
 
     @staticmethod
@@ -230,7 +230,7 @@ class CVEFetcher:
         return (
             cve.get("cvss", 0.0) >= 9.0
             or cve.get("is_kev", False)
-            or cve.get("exploit_status") == "Aktiv"
+            or cve.get("exploit_status") == "Active"
             or cve.get("is_broad_impact", False)
         )
 
