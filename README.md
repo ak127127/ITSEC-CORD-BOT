@@ -116,6 +116,40 @@ pip install -r requirements.txt
 sudo systemctl restart itsec-cord-bot
 ```
 
+## Database Health Checks
+
+Install SQLite CLI if needed:
+
+Oracle Linux / RHEL / Rocky / AlmaLinux:
+
+```bash
+sudo dnf install -y sqlite
+```
+
+Ubuntu/Debian:
+
+```bash
+sudo apt install -y sqlite3
+```
+
+Run basic checks (from project directory):
+
+```bash
+cd /opt/ITSEC-CORD-BOT
+sqlite3 itsec_cord_bot.db ".tables"
+sqlite3 itsec_cord_bot.db "SELECT COUNT(*) FROM published_cves;"
+sqlite3 itsec_cord_bot.db "SELECT COUNT(*) FROM published_news;"
+sqlite3 itsec_cord_bot.db "SELECT COUNT(*) FROM user_subscriptions;"
+sqlite3 itsec_cord_bot.db "SELECT source_name,last_fetch_at FROM source_state ORDER BY source_name;"
+```
+
+Deduplication checks (should return no rows):
+
+```bash
+sqlite3 itsec_cord_bot.db "SELECT cve_id, COUNT(*) c FROM published_cves GROUP BY cve_id HAVING c > 1;"
+sqlite3 itsec_cord_bot.db "SELECT item_url, COUNT(*) c FROM published_news GROUP BY item_url HAVING c > 1;"
+```
+
 ## Discord Commands
 
 - `/itsec cve <CVE-ID>`
