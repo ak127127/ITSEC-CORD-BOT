@@ -37,6 +37,8 @@ class CVEFetcher:
         parsed = self._parse_date(date_str)
         if not parsed:
             return False
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
         now = datetime.now(tz=timezone.utc)
         return now - parsed <= timedelta(hours=hours)
 
