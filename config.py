@@ -15,9 +15,64 @@ DEFAULT_CHANNELS = {
     "high": "cve-high",
     "news": "security-news",
     "cert_se": "cert-se-alerts",
+    "vendor_microsoft": "vendor-microsoft",
+    "vendor_linux": "vendor-linux",
+    "vendor_google": "vendor-google",
+    "vendor_cisco": "vendor-cisco",
+    "vendor_fortinet": "vendor-fortinet",
+    "vendor_vmware": "vendor-vmware",
     "weekly": "weekly-summary",
     "log": "itsec-log",
     "ask": "ask-itsec",
+}
+
+NEWS_VENDOR_MATCHERS = {
+    "vendor_microsoft": {
+        "microsoft",
+        "windows",
+        "sharepoint",
+        "exchange",
+        "azure",
+        "msrc",
+    },
+    "vendor_linux": {
+        "linux",
+        "kernel",
+        "ubuntu",
+        "debian",
+        "red hat",
+        "rhel",
+        "centos",
+        "rocky linux",
+        "almalinux",
+    },
+    "vendor_google": {
+        "google",
+        "android",
+        "chrome",
+        "chromium",
+        "gcp",
+    },
+    "vendor_cisco": {
+        "cisco",
+        "catalyst",
+        "secure firewall",
+        "fmc",
+        "asa",
+    },
+    "vendor_fortinet": {
+        "fortinet",
+        "fortigate",
+        "fortios",
+        "fortimanager",
+    },
+    "vendor_vmware": {
+        "vmware",
+        "aria",
+        "esxi",
+        "vcenter",
+        "vsphere",
+    },
 }
 
 NEWS_FEEDS = [

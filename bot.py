@@ -9,7 +9,7 @@ import discord
 from bs4 import BeautifulSoup
 from discord.ext import commands
 
-from config import DEFAULT_CHANNELS, TZ_STOCKHOLM, get_optional_guild_id, get_setting
+from config import DEFAULT_CHANNELS, NEWS_VENDOR_MATCHERS, TZ_STOCKHOLM, get_optional_guild_id, get_setting
 from cve_fetcher import CVEFetcher
 from database import Database
 from news_fetcher import NewsFetcher
@@ -168,6 +168,23 @@ class ItSecCordBot(commands.Bot):
             f"📎 [Source]({source_url})"
         )
 
+    @staticmethod
+    def _match_vendor_news_channels(item: dict[str, str]) -> set[str]:
+        blob = " ".join(
+            [
+                item.get("title", ""),
+                item.get("summary", ""),
+                item.get("source_name", ""),
+                item.get("url", ""),
+            ]
+        ).lower()
+
+        matches: set[str] = set()
+        for channel_key, keywords in NEWS_VENDOR_MATCHERS.items():
+            if any(keyword in blob for keyword in keywords):
+                matches.add(channel_key)
+        return matches
+
     async def run_cve_cycle(self):
         logger.info("Starting CVE/KEV cycle")
         cves = await asyncio.to_thread(self.cve_fetcher.fetch_recent_nvd_cves, 24)
@@ -222,14 +239,26 @@ class ItSecCordBot(commands.Bot):
             if not inserted:
                 continue
             sent_count += 1
+            formatted = self.format_news_alert(item)
+            posted_channel_ids: set[int] = set()
 
-            target_channel = news_channel
+            if news_channel:
+                await news_channel.send(formatted)
+                posted_channel_ids.add(news_channel.id)
+
             source_name = (item.get("source_name") or "").lower()
+            extra_keys: set[str] = set()
             if "cert-se" in source_name or "cert se" in source_name:
-                target_channel = cert_se_channel or news_channel
+                extra_keys.add("cert_se")
 
-            if target_channel:
-                await target_channel.send(self.format_news_alert(item))
+            extra_keys.update(self._match_vendor_news_channels(item))
+
+            for channel_key in sorted(extra_keys):
+                channel = self.channel_map.get(channel_key)
+                if not channel or channel.id in posted_channel_ids:
+                    continue
+                await channel.send(formatted)
+                posted_channel_ids.add(channel.id)
 
         await self.db.set_last_fetch("news")
         if sent_count:

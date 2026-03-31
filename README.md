@@ -147,9 +147,21 @@ On startup (when a guild is resolved), the bot creates or uses channels under on
 - `cve-high`
 - `security-news`
 - `cert-se-alerts`
+- `vendor-microsoft`
+- `vendor-linux`
+- `vendor-google`
+- `vendor-cisco`
+- `vendor-fortinet`
+- `vendor-vmware`
 - `weekly-summary`
 - `itsec-log`
 - `ask-itsec`
+
+News routing behavior:
+
+- Every news item is always posted in `security-news`.
+- CERT-SE items are also posted in `cert-se-alerts`.
+- Major-vendor items are duplicated into their vendor channels.
 
 ## Security Notes
 
