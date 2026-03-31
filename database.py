@@ -90,6 +90,8 @@ class Database:
             )
             """
         )
+        # Migration order matters for existing databases: ensure column first.
+        await self._ensure_news_fingerprint_column()
         await self.connection.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_published_news_fingerprint ON published_news(news_fingerprint)"
         )
@@ -105,7 +107,6 @@ class Database:
         await self.connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_delivery_log_delivered_at ON delivery_log(delivered_at)"
         )
-        await self._ensure_news_fingerprint_column()
         await self.connection.commit()
 
     async def _ensure_news_fingerprint_column(self):
