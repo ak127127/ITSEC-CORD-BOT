@@ -93,30 +93,46 @@ class ItSecCordBot(commands.Bot):
 
         top_uncategorized_order: list[str] = []
 
-        for key, channel_name in DEFAULT_CHANNELS.items():
-            channel = discord.utils.get(guild.text_channels, name=channel_name)
+        try:
+            for key, channel_name in DEFAULT_CHANNELS.items():
+                channel = discord.utils.get(guild.text_channels, name=channel_name)
 
-            # Keep these visible at the top of Discord's default text channel section.
-            if key in {"cert_se", "news"}:
-                target_category = None
-                top_uncategorized_order.append(key)
-            elif key.startswith("vendor_"):
-                target_category = vendor_category
-            else:
-                target_category = main_category
+                # Keep these visible at the top of Discord's default text channel section.
+                if key in {"cert_se", "news"}:
+                    target_category = None
+                    top_uncategorized_order.append(key)
+                elif key.startswith("vendor_"):
+                    target_category = vendor_category
+                else:
+                    target_category = main_category
 
-            if not channel:
-                channel = await guild.create_text_channel(channel_name, category=target_category)
-            elif channel.category != target_category:
-                await channel.edit(category=target_category)
+                if not channel:
+                    channel = await guild.create_text_channel(channel_name, category=target_category)
+                elif channel.category != target_category:
+                    await channel.edit(category=target_category)
 
-            self.channel_map[key] = channel
+                self.channel_map[key] = channel
 
-        for index, key in enumerate(top_uncategorized_order):
-            channel = self.channel_map.get(key)
-            if not channel:
-                continue
-            await channel.edit(position=index)
+            desired_top_channels = [
+                self.channel_map[key]
+                for key in top_uncategorized_order
+                if key in self.channel_map and self.channel_map[key].category is None
+            ]
+            other_uncategorized = [
+                ch
+                for ch in sorted(guild.text_channels, key=lambda c: c.position)
+                if ch.category is None and ch not in desired_top_channels
+            ]
+
+            # Re-apply all uncategorized positions in one deterministic pass.
+            for index, channel in enumerate(desired_top_channels + other_uncategorized):
+                await channel.edit(category=None, position=index)
+
+        except discord.Forbidden:
+            logger.warning(
+                "Missing 'Manage Channels' permission, cannot enforce category/channel order in guild %s",
+                guild.id,
+            )
 
     async def log_message(self, message: str):
         logger.info(message)
