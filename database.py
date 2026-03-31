@@ -12,6 +12,7 @@ class Database:
     def __init__(self):
         self.db_path = get_setting("DB_PATH", "itsec_cord_bot.db")
         self.connection: Optional[aiosqlite.Connection] = None
+        self.has_news_fingerprint = False
 
     async def connect(self):
         """Connect to SQLite and ensure schema/tables exist."""
@@ -90,11 +91,16 @@ class Database:
             )
             """
         )
-        # Migration order matters for existing databases: ensure column first.
+        # Migration/index are best-effort for legacy DBs. Startup must not fail.
         await self._ensure_news_fingerprint_column()
-        await self.connection.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_published_news_fingerprint ON published_news(news_fingerprint)"
-        )
+        self.has_news_fingerprint = await self._has_column("published_news", "news_fingerprint")
+        if self.has_news_fingerprint:
+            try:
+                await self.connection.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_published_news_fingerprint ON published_news(news_fingerprint)"
+                )
+            except aiosqlite.OperationalError:
+                self.has_news_fingerprint = False
         await self.connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_published_cves_cvss ON published_cves(cvss)"
         )
@@ -111,12 +117,19 @@ class Database:
 
     async def _ensure_news_fingerprint_column(self):
         conn = self._require_conn()
-        cursor = await conn.execute("PRAGMA table_info(published_news)")
-        rows = await cursor.fetchall()
-        await cursor.close()
-        col_names = {row[1] for row in rows}
+        col_names = await self._get_column_names("published_news")
         if "news_fingerprint" not in col_names:
             await conn.execute("ALTER TABLE published_news ADD COLUMN news_fingerprint TEXT")
+
+    async def _get_column_names(self, table_name: str) -> set[str]:
+        conn = self._require_conn()
+        cursor = await conn.execute(f"PRAGMA table_info({table_name})")
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return {str(row[1]) for row in rows}
+
+    async def _has_column(self, table_name: str, column_name: str) -> bool:
+        return column_name in await self._get_column_names(table_name)
 
     def _require_conn(self) -> aiosqlite.Connection:
         if not self.connection:
@@ -252,13 +265,22 @@ class Database:
         published_at: Optional[str],
     ) -> bool:
         conn = self._require_conn()
-        cursor = await conn.execute(
-            """
-            INSERT OR IGNORE INTO published_news (item_url, title, source_name, news_fingerprint, published_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (item_url, title, source_name, news_fingerprint, published_at),
-        )
+        if self.has_news_fingerprint:
+            cursor = await conn.execute(
+                """
+                INSERT OR IGNORE INTO published_news (item_url, title, source_name, news_fingerprint, published_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (item_url, title, source_name, news_fingerprint, published_at),
+            )
+        else:
+            cursor = await conn.execute(
+                """
+                INSERT OR IGNORE INTO published_news (item_url, title, source_name, published_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (item_url, title, source_name, published_at),
+            )
         await conn.commit()
         return cursor.rowcount > 0
 
