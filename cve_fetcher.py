@@ -133,100 +133,67 @@ class CVEFetcher:
 
         parsed: list[dict[str, Any]] = []
         for item in payload.get("vulnerabilities", []):
-                parsed_item = self._parse_nvd_item(item)
-                if not parsed_item:
-                    continue
-
-                if not self._is_recent(parsed_item.get("published_at"), hours):
-                    continue
-                parsed.append(parsed_item)
-
-            return parsed
-
-        def _parse_nvd_item(self, item: dict[str, Any]) -> dict[str, Any] | None:
-            cve = item.get("cve", {})
-            cve_id = cve.get("id")
-            if not cve_id:
-                return None
-
-            published_at = cve.get("published") or cve.get("lastModified")
-            description = self._extract_description(cve)
-            cvss = self._extract_cvss(cve)
-            severity = self._severity_from_cvss(cvss)
-            affected = self._extract_affected(cve)
-            refs = self._extract_references(cve)
-
-            return {
-                "cve_id": cve_id.upper(),
-                "title": self._extract_title(cve_id.upper(), description),
-                "summary": description,
-                "cvss": cvss,
-                "severity": severity,
-                "is_kev": False,
-                "exploit_status": self._exploit_status(refs, False),
-                "affected": affected,
-                "action": "Patcha till senaste vendor-rekommenderade version.",
-                "url": f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
-                "vendor_url": refs[0] if refs else f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
-                "exploit_url": refs[0] if refs else None,
-                "published_at": published_at,
-                "is_broad_impact": self._is_broad_impact(cve, description, affected),
-            }
-
-        def fetch_cve_by_id(self, cve_id: str) -> dict[str, Any] | None:
-            """Hamta en enskild CVE fran NVD via CVE-ID."""
-            cve_id = cve_id.upper().strip()
-            try:
-                response = self.session.get(
-                    NVD_API_BASE,
-                    params={"cveId": cve_id},
-                    timeout=30,
-                )
-                response.raise_for_status()
-                payload = response.json()
-            except Exception as exc:
-                logger.exception("Fel vid hamtning av CVE %s: %s", cve_id, exc)
-                return None
-
-            vulns = payload.get("vulnerabilities", [])
-            if not vulns:
-                return None
-
-            parsed = self._parse_nvd_item(vulns[0])
-            if not parsed:
-                return None
-            return parsed
-
-            published_at = cve.get("published") or cve.get("lastModified")
-            if not self._is_recent(published_at, hours):
+            parsed_item = self._parse_nvd_item(item)
+            if not parsed_item:
                 continue
 
-            description = self._extract_description(cve)
-            cvss = self._extract_cvss(cve)
-            severity = self._severity_from_cvss(cvss)
-            affected = self._extract_affected(cve)
-            refs = self._extract_references(cve)
+            if not self._is_recent(parsed_item.get("published_at"), hours):
+                continue
 
-            parsed.append(
-                {
-                    "cve_id": cve_id.upper(),
-                    "title": self._extract_title(cve_id.upper(), description),
-                    "summary": description,
-                    "cvss": cvss,
-                    "severity": severity,
-                    "is_kev": False,
-                    "exploit_status": self._exploit_status(refs, False),
-                    "affected": affected,
-                    "action": "Patcha till senaste vendor-rekommenderade version.",
-                    "url": f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
-                    "vendor_url": refs[0] if refs else f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
-                    "exploit_url": refs[0] if refs else None,
-                    "published_at": published_at,
-                    "is_broad_impact": self._is_broad_impact(cve, description, affected),
-                }
-            )
+            parsed.append(parsed_item)
 
         return parsed
+
+    def _parse_nvd_item(self, item: dict[str, Any]) -> dict[str, Any] | None:
+        cve = item.get("cve", {})
+        cve_id = cve.get("id")
+        if not cve_id:
+            return None
+
+        published_at = cve.get("published") or cve.get("lastModified")
+        description = self._extract_description(cve)
+        cvss = self._extract_cvss(cve)
+        severity = self._severity_from_cvss(cvss)
+        affected = self._extract_affected(cve)
+        refs = self._extract_references(cve)
+
+        return {
+            "cve_id": cve_id.upper(),
+            "title": self._extract_title(cve_id.upper(), description),
+            "summary": description,
+            "cvss": cvss,
+            "severity": severity,
+            "is_kev": False,
+            "exploit_status": self._exploit_status(refs, False),
+            "affected": affected,
+            "action": "Patcha till senaste vendor-rekommenderade version.",
+            "url": f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
+            "vendor_url": refs[0] if refs else f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
+            "exploit_url": refs[0] if refs else None,
+            "published_at": published_at,
+            "is_broad_impact": self._is_broad_impact(cve, description, affected),
+        }
+
+    def fetch_cve_by_id(self, cve_id: str) -> dict[str, Any] | None:
+        """Hamta en enskild CVE fran NVD via CVE-ID."""
+        cve_id = cve_id.upper().strip()
+        try:
+            response = self.session.get(
+                NVD_API_BASE,
+                params={"cveId": cve_id},
+                timeout=30,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            logger.exception("Fel vid hamtning av CVE %s: %s", cve_id, exc)
+            return None
+
+        vulns = payload.get("vulnerabilities", [])
+        if not vulns:
+            return None
+
+        return self._parse_nvd_item(vulns[0])
 
     def fetch_cisa_kev_set(self) -> set[str]:
         """Hamta CISA KEV-listan som set med CVE-ID."""
