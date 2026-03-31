@@ -83,17 +83,40 @@ class ItSecCordBot(commands.Bot):
         return self.guilds[0] if self.guilds else None
 
     async def _ensure_channel_structure(self, guild: discord.Guild):
-        category = discord.utils.get(guild.categories, name="ITSEC-CORD-BOT")
-        if not category:
-            category = await guild.create_category("ITSEC-CORD-BOT")
+        main_category = discord.utils.get(guild.categories, name="ITSEC-CORD-BOT")
+        if not main_category:
+            main_category = await guild.create_category("ITSEC-CORD-BOT")
+
+        vendor_category = discord.utils.get(guild.categories, name="Vendors")
+        if not vendor_category:
+            vendor_category = await guild.create_category("Vendors")
+
+        top_uncategorized_order: list[str] = []
 
         for key, channel_name in DEFAULT_CHANNELS.items():
             channel = discord.utils.get(guild.text_channels, name=channel_name)
+
+            # Keep these visible at the top of Discord's default text channel section.
+            if key in {"cert_se", "news"}:
+                target_category = None
+                top_uncategorized_order.append(key)
+            elif key.startswith("vendor_"):
+                target_category = vendor_category
+            else:
+                target_category = main_category
+
             if not channel:
-                channel = await guild.create_text_channel(channel_name, category=category)
-            elif channel.category_id != category.id:
-                await channel.edit(category=category)
+                channel = await guild.create_text_channel(channel_name, category=target_category)
+            elif channel.category != target_category:
+                await channel.edit(category=target_category)
+
             self.channel_map[key] = channel
+
+        for index, key in enumerate(top_uncategorized_order):
+            channel = self.channel_map.get(key)
+            if not channel:
+                continue
+            await channel.edit(position=index)
 
     async def log_message(self, message: str):
         logger.info(message)
@@ -168,6 +191,24 @@ class ItSecCordBot(commands.Bot):
             f"📎 [Source]({source_url})"
         )
 
+    async def _find_subscribed_users(self, text_blob: str) -> set[str]:
+        matches: set[str] = set()
+        all_subs = await self.db.get_all_subscriptions()
+        blob = text_blob.lower()
+        for user_id, vendor in all_subs:
+            if vendor and vendor in blob:
+                matches.add(user_id)
+        return matches
+
+    async def _notify_subscribed_users(self, user_ids: set[str], message: str):
+        for user_id in sorted(user_ids):
+            try:
+                user = self.get_user(int(user_id)) or await self.fetch_user(int(user_id))
+                if user:
+                    await user.send(message)
+            except Exception as exc:
+                logger.debug("Failed sending subscription DM to %s: %s", user_id, exc)
+
     @staticmethod
     def _match_vendor_news_channels(item: dict[str, str]) -> set[str]:
         blob = " ".join(
@@ -212,10 +253,24 @@ class ItSecCordBot(commands.Bot):
                 if should_ping_here and channel_key == "critical":
                     await channel.send("@here")
                 await channel.send(message)
+                await self.db.record_delivery("cve", cve["cve_id"], channel_key)
 
             inserted = await self.db.insert_cve_if_new(cve, posted_channel=channel_key)
             if inserted:
                 sent_count += 1
+                subscription_blob = " ".join(
+                    [
+                        cve.get("cve_id", ""),
+                        cve.get("title", ""),
+                        cve.get("summary", ""),
+                        cve.get("affected", ""),
+                        cve.get("action", ""),
+                    ]
+                )
+                subscribed_users = await self._find_subscribed_users(subscription_blob)
+                if subscribed_users:
+                    dm_message = "🔔 **Subscription match (CVE)**\n" + message
+                    await self._notify_subscribed_users(subscribed_users, dm_message)
 
         await self.db.set_last_fetch("cve")
         await self.db.set_last_fetch("kev")
@@ -225,6 +280,16 @@ class ItSecCordBot(commands.Bot):
     async def run_news_cycle(self):
         logger.info("Starting news cycle")
         items = await asyncio.to_thread(self.news_fetcher.fetch_recent_news, 30)
+        feed_reports = self.news_fetcher.get_last_feed_reports()
+
+        for report in feed_reports:
+            await self.db.update_feed_health(
+                source_name=str(report.get("source", "unknown")),
+                ok=bool(report.get("ok", False)),
+                status_code=report.get("status"),
+                entries=int(report.get("entries", 0) or 0),
+                error_message=report.get("error"),
+            )
 
         sent_count = 0
         news_channel = self.channel_map.get("news")
@@ -234,6 +299,7 @@ class ItSecCordBot(commands.Bot):
                 item_url=item["url"],
                 title=item.get("title", "Untitled"),
                 source_name=item.get("source_name", "Unknown"),
+                news_fingerprint=item.get("news_fingerprint"),
                 published_at=item.get("published_at"),
             )
             if not inserted:
@@ -245,6 +311,7 @@ class ItSecCordBot(commands.Bot):
             if news_channel:
                 await news_channel.send(formatted)
                 posted_channel_ids.add(news_channel.id)
+                await self.db.record_delivery("news", item["url"], "news")
 
             source_name = (item.get("source_name") or "").lower()
             extra_keys: set[str] = set()
@@ -259,6 +326,20 @@ class ItSecCordBot(commands.Bot):
                     continue
                 await channel.send(formatted)
                 posted_channel_ids.add(channel.id)
+                await self.db.record_delivery("news", item["url"], channel_key)
+
+            subscription_blob = " ".join(
+                [
+                    item.get("title", ""),
+                    item.get("summary", ""),
+                    item.get("source_name", ""),
+                    item.get("url", ""),
+                ]
+            )
+            subscribed_users = await self._find_subscribed_users(subscription_blob)
+            if subscribed_users:
+                dm_message = "🔔 **Subscription match (news)**\n" + formatted
+                await self._notify_subscribed_users(subscribed_users, dm_message)
 
         await self.db.set_last_fetch("news")
         if sent_count:

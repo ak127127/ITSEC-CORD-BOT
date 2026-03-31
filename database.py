@@ -14,7 +14,7 @@ class Database:
         self.connection: Optional[aiosqlite.Connection] = None
 
     async def connect(self):
-        """Anslut till SQLite och skapa tabeller/index."""
+        """Connect to SQLite and ensure schema/tables exist."""
         self.connection = await aiosqlite.connect(self.db_path)
         self.connection.row_factory = aiosqlite.Row
 
@@ -60,10 +60,38 @@ class Database:
                 item_url TEXT PRIMARY KEY,
                 title TEXT,
                 source_name TEXT,
+                news_fingerprint TEXT,
                 published_at TEXT,
                 fetched_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
+        )
+        await self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS delivery_log (
+                item_type TEXT,
+                item_key TEXT,
+                channel_key TEXT,
+                delivered_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (item_type, item_key, channel_key)
+            )
+            """
+        )
+        await self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feed_health (
+                source_name TEXT PRIMARY KEY,
+                last_ok_at TEXT,
+                last_error_at TEXT,
+                last_status_code INTEGER,
+                last_error_message TEXT,
+                error_count INTEGER DEFAULT 0,
+                last_entries INTEGER DEFAULT 0
+            )
+            """
+        )
+        await self.connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_published_news_fingerprint ON published_news(news_fingerprint)"
         )
         await self.connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_published_cves_cvss ON published_cves(cvss)"
@@ -71,11 +99,27 @@ class Database:
         await self.connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_published_cves_fetched_at ON published_cves(fetched_at)"
         )
+        await self.connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_subscriptions_vendor ON user_subscriptions(vendor)"
+        )
+        await self.connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_delivery_log_delivered_at ON delivery_log(delivered_at)"
+        )
+        await self._ensure_news_fingerprint_column()
         await self.connection.commit()
+
+    async def _ensure_news_fingerprint_column(self):
+        conn = self._require_conn()
+        cursor = await conn.execute("PRAGMA table_info(published_news)")
+        rows = await cursor.fetchall()
+        await cursor.close()
+        col_names = {row[1] for row in rows}
+        if "news_fingerprint" not in col_names:
+            await conn.execute("ALTER TABLE published_news ADD COLUMN news_fingerprint TEXT")
 
     def _require_conn(self) -> aiosqlite.Connection:
         if not self.connection:
-            raise RuntimeError("Databasanslutning saknas. Kor connect() forst.")
+            raise RuntimeError("Database connection missing. Run connect() first.")
         return self.connection
 
     async def is_cve_published(self, cve_id: str) -> bool:
@@ -86,7 +130,7 @@ class Database:
         return result is not None
 
     async def insert_cve_if_new(self, cve: dict[str, Any], posted_channel: str) -> bool:
-        """Spara CVE om den inte finns; returnerar True om ny rad skapades."""
+        """Store CVE if new; return True if inserted."""
         conn = self._require_conn()
         cursor = await conn.execute(
             """
@@ -203,18 +247,74 @@ class Database:
         item_url: str,
         title: str,
         source_name: str,
+        news_fingerprint: Optional[str],
         published_at: Optional[str],
     ) -> bool:
         conn = self._require_conn()
         cursor = await conn.execute(
             """
-            INSERT OR IGNORE INTO published_news (item_url, title, source_name, published_at)
-            VALUES (?, ?, ?, ?)
+            INSERT OR IGNORE INTO published_news (item_url, title, source_name, news_fingerprint, published_at)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (item_url, title, source_name, published_at),
+            (item_url, title, source_name, news_fingerprint, published_at),
         )
         await conn.commit()
         return cursor.rowcount > 0
+
+    async def record_delivery(self, item_type: str, item_key: str, channel_key: str):
+        conn = self._require_conn()
+        await conn.execute(
+            """
+            INSERT OR IGNORE INTO delivery_log (item_type, item_key, channel_key)
+            VALUES (?, ?, ?)
+            """,
+            (item_type, item_key, channel_key),
+        )
+        await conn.commit()
+
+    async def update_feed_health(
+        self,
+        source_name: str,
+        ok: bool,
+        status_code: int | None,
+        entries: int,
+        error_message: str | None,
+    ):
+        conn = self._require_conn()
+        now_iso = datetime.utcnow().isoformat()
+        await conn.execute(
+            """
+            INSERT INTO feed_health (
+                source_name, last_ok_at, last_error_at, last_status_code,
+                last_error_message, error_count, last_entries
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source_name) DO UPDATE SET
+                last_ok_at = CASE WHEN excluded.last_ok_at IS NOT NULL THEN excluded.last_ok_at ELSE feed_health.last_ok_at END,
+                last_error_at = CASE WHEN excluded.last_error_at IS NOT NULL THEN excluded.last_error_at ELSE feed_health.last_error_at END,
+                last_status_code = excluded.last_status_code,
+                last_error_message = excluded.last_error_message,
+                error_count = CASE WHEN excluded.last_error_at IS NOT NULL THEN feed_health.error_count + 1 ELSE feed_health.error_count END,
+                last_entries = excluded.last_entries
+            """,
+            (
+                source_name,
+                now_iso if ok else None,
+                None if ok else now_iso,
+                status_code,
+                None if ok else (error_message or "unknown error"),
+                0 if ok else 1,
+                entries,
+            ),
+        )
+        await conn.commit()
+
+    async def get_all_subscriptions(self) -> list[tuple[str, str]]:
+        conn = self._require_conn()
+        cursor = await conn.execute("SELECT user_id, vendor FROM user_subscriptions")
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [(str(row[0]), str(row[1])) for row in rows]
 
     async def get_weekly_stats(self) -> dict[str, int]:
         conn = self._require_conn()
@@ -224,7 +324,7 @@ class Database:
                 SUM(CASE WHEN cvss >= 9.0 THEN 1 ELSE 0 END) AS critical_count,
                 SUM(CASE WHEN cvss >= 7.0 AND cvss < 9.0 THEN 1 ELSE 0 END) AS high_count,
                 SUM(CASE WHEN is_kev = 1 THEN 1 ELSE 0 END) AS kev_count,
-                SUM(CASE WHEN lower(exploit_status) = 'aktiv' THEN 1 ELSE 0 END) AS active_exploit_count
+                SUM(CASE WHEN lower(exploit_status) IN ('active', 'aktiv') THEN 1 ELSE 0 END) AS active_exploit_count
             FROM published_cves
             WHERE datetime(fetched_at) >= datetime('now', '-7 day')
             """

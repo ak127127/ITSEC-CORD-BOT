@@ -10,6 +10,9 @@ ITSEC-CORD-BOT is a Discord security monitoring bot that tracks CVEs, CISA KEV e
 - Pulls security news from RSS feeds
 - Duplicates major-vendor news into dedicated vendor channels
 - Routes CERT-SE posts to a dedicated CERT-SE channel
+- Uses fingerprint-based cross-source deduplication for news
+- Sends subscription match notifications via DM
+- Tracks feed health and per-channel delivery logs in SQLite
 - Generates weekly summaries
 - Provides slash commands for lookup, status, and subscriptions
 
@@ -141,6 +144,8 @@ sqlite3 itsec_cord_bot.db "SELECT COUNT(*) FROM published_cves;"
 sqlite3 itsec_cord_bot.db "SELECT COUNT(*) FROM published_news;"
 sqlite3 itsec_cord_bot.db "SELECT COUNT(*) FROM user_subscriptions;"
 sqlite3 itsec_cord_bot.db "SELECT source_name,last_fetch_at FROM source_state ORDER BY source_name;"
+sqlite3 itsec_cord_bot.db "SELECT COUNT(*) FROM delivery_log;"
+sqlite3 itsec_cord_bot.db "SELECT source_name,last_status_code,error_count,last_entries FROM feed_health ORDER BY source_name;"
 ```
 
 Deduplication checks (should return no rows):
@@ -148,6 +153,7 @@ Deduplication checks (should return no rows):
 ```bash
 sqlite3 itsec_cord_bot.db "SELECT cve_id, COUNT(*) c FROM published_cves GROUP BY cve_id HAVING c > 1;"
 sqlite3 itsec_cord_bot.db "SELECT item_url, COUNT(*) c FROM published_news GROUP BY item_url HAVING c > 1;"
+sqlite3 itsec_cord_bot.db "SELECT news_fingerprint, COUNT(*) c FROM published_news WHERE news_fingerprint IS NOT NULL GROUP BY news_fingerprint HAVING c > 1;"
 ```
 
 ## Discord Commands
