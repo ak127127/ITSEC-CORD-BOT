@@ -1,0 +1,7 @@
+discord.py>=2.3
+aiosqlite
+apscheduler
+requests
+python-dotenv
+feedparser
+beautifulsoup4
