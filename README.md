@@ -1,0 +1,168 @@
+# ITSEC-CORD-BOT
+
+ITSEC-CORD-BOT is a Discord security monitoring bot that tracks CVEs, CISA KEV entries, and security news feeds.
+
+## Features
+
+- Fetches recent CVEs from NVD
+- Enriches CVEs with CISA KEV data
+- Posts alerts to Discord channels
+- Pulls security news from RSS feeds
+- Generates weekly summaries
+- Provides slash commands for lookup, status, and subscriptions
+
+## Requirements
+
+- Python 3.9+
+- Discord bot token
+- Optional: NVD API key (recommended for better rate limits)
+
+## Quick Start (Local)
+
+```bash
+git clone https://github.com/ak127127/ITSEC-CORD-BOT.git
+cd ITSEC-CORD-BOT
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Update `.env`:
+
+```dotenv
+DISCORD_TOKEN=your_discord_token_here
+GUILD_ID=
+NVD_API_KEY=your_nvd_api_key_here
+LOG_LEVEL=INFO
+DB_PATH=itsec_cord_bot.db
+```
+
+Run:
+
+```bash
+source .venv/bin/activate
+python bot.py
+```
+
+## OS-Specific Package Install
+
+Use one of the following before setup:
+
+Ubuntu/Debian:
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-venv python3-pip
+```
+
+Oracle Linux / RHEL / Rocky / AlmaLinux:
+
+```bash
+sudo dnf update -y
+sudo dnf install -y git python3 python3-pip
+```
+
+## Run as a systemd Service (Linux VPS)
+
+1. Clone and set up the app in a stable path (example: `/opt/ITSEC-CORD-BOT`).
+2. Create a service file:
+
+```bash
+sudo tee /etc/systemd/system/itsec-cord-bot.service > /dev/null << 'EOF'
+[Unit]
+Description=ITSEC CORD BOT
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_LINUX_USER
+WorkingDirectory=/opt/ITSEC-CORD-BOT
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ITSEC-CORD-BOT/.venv/bin/python /opt/ITSEC-CORD-BOT/bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+3. Enable and start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now itsec-cord-bot
+```
+
+4. Check status/logs:
+
+```bash
+sudo systemctl status itsec-cord-bot --no-pager
+sudo journalctl -u itsec-cord-bot -f
+```
+
+## Update on VPS
+
+```bash
+cd /opt/ITSEC-CORD-BOT
+git pull origin master
+source .venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart itsec-cord-bot
+```
+
+## Discord Commands
+
+- `/itsec cve <CVE-ID>`
+- `/itsec latest [count]`
+- `/itsec search <term>`
+- `/itsec watch <vendor>`
+- `/itsec unwatch <vendor>`
+- `/itsec mysubs`
+- `/itsec weekly`
+- `/itsec status`
+- `/itsec_help`
+- `/news_latest`
+
+## Invite Bot to Discord
+
+In Discord Developer Portal:
+
+1. Open `OAuth2` -> `URL Generator`
+2. Select scopes: `bot`, `applications.commands`
+3. Select minimum bot permissions:
+- `View Channels`
+- `Send Messages`
+- `Embed Links`
+- `Read Message History`
+- `Manage Channels` (required only if you want auto channel/category creation)
+
+## Channel Structure
+
+On startup (when a guild is resolved), the bot creates or uses channels under one category:
+
+- `cve-kritisk`
+- `cve-hog`
+- `sakerhetsnyheter`
+- `veckosammanfattning`
+- `itsec-logg`
+- `fraga-itsec`
+
+## Security Notes
+
+- Never commit real tokens or API keys.
+- Keep secrets only in local/server `.env` files.
+- Use `.env.example` as a template with placeholders.
+
+## Troubleshooting
+
+- `TypeError: can't subtract offset-naive and offset-aware datetimes`
+  - Pull latest code and restart the service.
+
+- `Privileged message content intent is missing`
+  - Safe to ignore for slash-command-only usage.
+
+- `PyNaCl is not installed`
+  - Only needed for voice features.
