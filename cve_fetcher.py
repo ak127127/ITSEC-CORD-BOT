@@ -231,14 +231,14 @@ class CVEFetcher:
             cve.get("cvss", 0.0) >= 9.0
             or cve.get("is_kev", False)
             or cve.get("exploit_status") == "Active"
-            or cve.get("is_broad_impact", False)
         )
 
     @staticmethod
     def should_publish_high(cve: dict[str, Any]) -> bool:
+        cvss = float(cve.get("cvss", 0.0) or 0.0)
         return (
-            7.0 <= cve.get("cvss", 0.0) < 9.0
-            and cve.get("is_broad_impact", False)
+            7.0 <= cvss < 9.0
+            or (4.0 <= cvss < 7.0 and cve.get("is_broad_impact", False))
         )
 
     def classify_channel(self, cve: dict[str, Any]) -> str | None:
