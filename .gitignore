@@ -1,3 +1,5 @@
+# ITSEC-CORD-BOT ignore rules
+
 # Environment variables
 .env
 .env.local

@@ -1,3 +1,5 @@
+# ITSEC-CORD-BOT runtime dependencies
+
 discord.py>=2.3
 aiosqlite
 apscheduler
