@@ -52,16 +52,18 @@ class ItSecCordBot(commands.Bot):
         if guild:
             await self._ensure_channel_structure(guild)
 
-        if guild:
-            # Prevent stale Discord command signatures by rebuilding guild command tree
-            # from current global commands on every startup.
-            self.tree.clear_commands(guild=guild)
-            self.tree.copy_global_to(guild=guild)
-            synced = await self.tree.sync(guild=guild)
-            logger.info("Synced %d guild commands", len(synced))
-        else:
-            synced = await self.tree.sync()
-            logger.info("Synced %d global commands", len(synced))
+        # Rebuild and sync commands for every guild the bot is in to avoid stale
+        # slash signatures in servers where the command schema changed.
+        if self.guilds:
+            for g in self.guilds:
+                self.tree.clear_commands(guild=g)
+                self.tree.copy_global_to(guild=g)
+                synced = await self.tree.sync(guild=g)
+                logger.info("Synced %d guild commands for %s (%s)", len(synced), g.name, g.id)
+
+        # Keep global commands synced too (used outside explicit guild contexts).
+        synced_global = await self.tree.sync()
+        logger.info("Synced %d global commands", len(synced_global))
 
         self.scheduler = BotScheduler(
             cve_job=self.run_cve_cycle,
