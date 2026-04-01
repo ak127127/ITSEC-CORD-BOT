@@ -53,6 +53,10 @@ class ItSecCordBot(commands.Bot):
             await self._ensure_channel_structure(guild)
 
         if guild:
+            # Prevent stale Discord command signatures by rebuilding guild command tree
+            # from current global commands on every startup.
+            self.tree.clear_commands(guild=guild)
+            self.tree.copy_global_to(guild=guild)
             synced = await self.tree.sync(guild=guild)
             logger.info("Synced %d guild commands", len(synced))
         else:
