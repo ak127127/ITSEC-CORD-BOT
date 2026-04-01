@@ -14,6 +14,17 @@ class ItSecCommands(commands.GroupCog, group_name="itsec", group_description="CV
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    @staticmethod
+    def _format_cve_list_line(row: dict) -> str:
+        cve_id = row.get("cve_id") or "CVE-UNKNOWN"
+        exploit = row.get("exploit_status") or "unknown"
+        source_url = row.get("source_url") or "n/a"
+        try:
+            cvss = float(row.get("cvss") or 0.0)
+        except (TypeError, ValueError):
+            cvss = 0.0
+        return f"- `{cve_id}` | CVSS {cvss:.1f} | {exploit} | {source_url}"
+
     @app_commands.command(name="cve", description="Get details for a specific CVE")
     async def cve(self, interaction: discord.Interaction, cve_id: str):
         await interaction.response.defer(thinking=True)
@@ -43,9 +54,7 @@ class ItSecCommands(commands.GroupCog, group_name="itsec", group_description="CV
 
         lines = ["**Latest CVE Alerts**"]
         for row in rows:
-            lines.append(
-                f"- `{row['cve_id']}` | CVSS {row['cvss']:.1f} | {row['exploit_status']} | {row['source_url']}"
-            )
+            lines.append(self._format_cve_list_line(row))
         await interaction.response.send_message("\n".join(lines))
 
     @app_commands.command(name="search", description="Search CVE history")
@@ -60,7 +69,7 @@ class ItSecCommands(commands.GroupCog, group_name="itsec", group_description="CV
 
         lines = [f"**Matches for `{term}`**"]
         for row in rows:
-            lines.append(f"- `{row['cve_id']}` | CVSS {row['cvss']:.1f} | {row['source_url']}")
+            lines.append(self._format_cve_list_line(row))
         await interaction.followup.send("\n".join(lines))
 
     async def cog_app_command_error(
