@@ -222,13 +222,23 @@ class ItSecCordBot(commands.Bot):
         if channel:
             logger.info("Reused channel %s", channel_name)
             if category and channel.category != category:
-                await channel.edit(category=category)
-                logger.info("Moved channel %s into %s", channel_name, category.name)
+                try:
+                    await channel.edit(category=category)
+                    logger.info("Moved channel %s into %s", channel_name, category.name)
+                except discord.Forbidden:
+                    logger.warning("Missing permission to move channel %s into %s", channel_name, category.name)
+                except discord.HTTPException as exc:
+                    logger.warning("Failed moving channel %s into %s: %s", channel_name, category.name, exc)
             if AUTO_SET_CHANNEL_PERMISSIONS:
-                if read_only:
-                    await self.apply_read_only_overwrites(channel)
-                else:
-                    await self.apply_writable_overwrites(channel)
+                try:
+                    if read_only:
+                        await self.apply_read_only_overwrites(channel)
+                    else:
+                        await self.apply_writable_overwrites(channel)
+                except discord.Forbidden:
+                    logger.warning("Missing permission to update overwrites for %s", channel_name)
+                except discord.HTTPException as exc:
+                    logger.warning("Failed updating overwrites for %s: %s", channel_name, exc)
             return channel
 
         if not AUTO_CREATE_CHANNELS:
@@ -243,10 +253,15 @@ class ItSecCordBot(commands.Bot):
             channel = await guild.create_text_channel(channel_name, category=category)
             logger.info("Created channel %s in %s", channel_name, category.name)
             if AUTO_SET_CHANNEL_PERMISSIONS:
-                if read_only:
-                    await self.apply_read_only_overwrites(channel)
-                else:
-                    await self.apply_writable_overwrites(channel)
+                try:
+                    if read_only:
+                        await self.apply_read_only_overwrites(channel)
+                    else:
+                        await self.apply_writable_overwrites(channel)
+                except discord.Forbidden:
+                    logger.warning("Missing permission to update overwrites for %s", channel_name)
+                except discord.HTTPException as exc:
+                    logger.warning("Failed updating overwrites for %s: %s", channel_name, exc)
             return channel
         except discord.Forbidden:
             logger.warning("Missing permission to create channel %s", channel_name)
