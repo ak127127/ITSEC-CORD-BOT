@@ -255,13 +255,18 @@ class ItSecCordBot(commands.Bot):
         return None
 
     async def _ensure_channel_structure(self, guild: discord.Guild):
-        try:
-            for category_name, channel_definitions in self._managed_category_index().items():
+        for category_name, channel_definitions in self._managed_category_index().items():
+            try:
                 category = await self.ensure_category(guild, category_name)
-                for channel_definition in channel_definitions:
-                    if not channel_definition.get("enabled", True):
-                        continue
+            except Exception as exc:
+                logger.warning("Failed to ensure category %s: %s", category_name, exc)
+                category = None
 
+            for channel_definition in channel_definitions:
+                if not channel_definition.get("enabled", True):
+                    continue
+
+                try:
                     channel = await self.ensure_text_channel(
                         guild=guild,
                         channel_name=channel_definition["name"],
@@ -270,12 +275,19 @@ class ItSecCordBot(commands.Bot):
                     )
                     if channel:
                         self.channel_map[channel_definition["key"]] = channel
+                except discord.Forbidden:
+                    logger.warning(
+                        "Missing permission while ensuring channel %s in guild %s",
+                        channel_definition["name"],
+                        guild.id,
+                    )
+                except discord.HTTPException as exc:
+                    logger.warning("HTTP error while ensuring channel %s: %s", channel_definition["name"], exc)
+                except Exception as exc:
+                    logger.warning("Unexpected error while ensuring channel %s: %s", channel_definition["name"], exc)
 
-        except discord.Forbidden:
-            logger.warning(
-                "Missing 'Manage Channels' permission, cannot enforce ITSEC channel structure in guild %s",
-                guild.id,
-            )
+        if "log" not in self.channel_map:
+            logger.warning("Managed log channel was not resolved during startup")
 
     @staticmethod
     def _managed_category_index() -> dict[str, list[dict[str, Any]]]:
