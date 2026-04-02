@@ -17,36 +17,89 @@ def _env_bool(key: str, default: bool) -> bool:
 
 
 ENABLE_CERT_SE = _env_bool("ENABLE_CERT_SE", True)
+AUTO_CREATE_CATEGORIES = _env_bool("AUTO_CREATE_CATEGORIES", True)
+AUTO_CREATE_CHANNELS = _env_bool("AUTO_CREATE_CHANNELS", True)
+AUTO_SET_CHANNEL_PERMISSIONS = _env_bool("AUTO_SET_CHANNEL_PERMISSIONS", True)
+ITSEC_LOG_READ_ONLY = _env_bool("ITSEC_LOG_READ_ONLY", True)
 
 TZ_STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
+ITSEC_MANAGED_STRUCTURE = [
+    {
+        "category_name": "ITSEC ALERTS",
+        "channels": [
+            {"key": "critical", "name": "cve-critical", "read_only": True},
+            {"key": "high", "name": "cve-high", "read_only": True},
+            {"key": "weekly", "name": "weekly-summary", "read_only": True},
+        ],
+    },
+    {
+        "category_name": "ITSEC NEWS",
+        "channels": [
+            {"key": "news", "name": "security-news", "read_only": True},
+            {"key": "cert_se", "name": "cert-se-alerts", "read_only": True, "enabled": ENABLE_CERT_SE},
+        ],
+    },
+    {
+        "category_name": "ITSEC VENDORS",
+        "channels": [
+            {"key": "vendor_microsoft", "name": "vendor-microsoft", "read_only": True},
+            {"key": "vendor_linux", "name": "vendor-linux", "read_only": True},
+            {"key": "vendor_google", "name": "vendor-google", "read_only": True},
+            {"key": "vendor_apple", "name": "vendor-apple", "read_only": True},
+            {"key": "vendor_cisco", "name": "vendor-cisco", "read_only": True},
+            {"key": "vendor_fortinet", "name": "vendor-fortinet", "read_only": True},
+            {"key": "vendor_vmware", "name": "vendor-vmware", "read_only": True},
+            {"key": "vendor_oracle", "name": "vendor-oracle", "read_only": True},
+            {"key": "vendor_adobe", "name": "vendor-adobe", "read_only": True},
+            {"key": "vendor_apache", "name": "vendor-apache", "read_only": True},
+            {"key": "vendor_nginx", "name": "vendor-nginx", "read_only": True},
+            {"key": "vendor_openssl", "name": "vendor-openssl", "read_only": True},
+            {"key": "vendor_docker", "name": "vendor-docker", "read_only": True},
+            {"key": "vendor_kubernetes", "name": "vendor-kubernetes", "read_only": True},
+            {"key": "vendor_postgresql", "name": "vendor-postgresql", "read_only": True},
+            {"key": "vendor_mysql", "name": "vendor-mysql", "read_only": True},
+        ],
+    },
+    {
+        "category_name": "ITSEC BOT",
+        "channels": [
+            {"key": "ask", "name": "ask-itsec", "read_only": False},
+            {"key": "log", "name": "itsec-log", "read_only": ITSEC_LOG_READ_ONLY},
+        ],
+    },
+]
+
 DEFAULT_CHANNELS = {
-    "critical": "cve-critical",
-    "high": "cve-high",
-    "news": "security-news",
-    "vendor_microsoft": "vendor-microsoft",
-    "vendor_linux": "vendor-linux",
-    "vendor_google": "vendor-google",
-    "vendor_apple": "vendor-apple",
-    "vendor_cisco": "vendor-cisco",
-    "vendor_fortinet": "vendor-fortinet",
-    "vendor_vmware": "vendor-vmware",
-    "vendor_oracle": "vendor-oracle",
-    "vendor_adobe": "vendor-adobe",
-    "vendor_apache": "vendor-apache",
-    "vendor_nginx": "vendor-nginx",
-    "vendor_openssl": "vendor-openssl",
-    "vendor_docker": "vendor-docker",
-    "vendor_kubernetes": "vendor-kubernetes",
-    "vendor_postgresql": "vendor-postgresql",
-    "vendor_mysql": "vendor-mysql",
-    "weekly": "weekly-summary",
-    "log": "itsec-log",
-    "ask": "ask-itsec",
+    channel["key"]: channel["name"]
+    for section in ITSEC_MANAGED_STRUCTURE
+    for channel in section["channels"]
+    if channel.get("enabled", True)
 }
 
-if ENABLE_CERT_SE:
-    DEFAULT_CHANNELS["cert_se"] = "cert-se-alerts"
+MANAGED_CATEGORY_NAMES = tuple(section["category_name"] for section in ITSEC_MANAGED_STRUCTURE)
+MANAGED_CHANNEL_NAMES = tuple(
+    channel["name"]
+    for section in ITSEC_MANAGED_STRUCTURE
+    for channel in section["channels"]
+    if channel.get("enabled", True)
+)
+MANAGED_CHANNEL_NAMES_BY_KEY = {
+    channel["key"]: channel["name"]
+    for section in ITSEC_MANAGED_STRUCTURE
+    for channel in section["channels"]
+    if channel.get("enabled", True)
+}
+MANAGED_CHANNELS_BY_NAME = {
+    channel["name"]: {
+        "key": channel["key"],
+        "category_name": section["category_name"],
+        "read_only": bool(channel["read_only"]),
+    }
+    for section in ITSEC_MANAGED_STRUCTURE
+    for channel in section["channels"]
+    if channel.get("enabled", True)
+}
 
 NEWS_VENDOR_MATCHERS = {
     "vendor_microsoft": {

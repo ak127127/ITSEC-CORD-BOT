@@ -15,6 +15,7 @@ ITSEC-CORD-BOT is a Discord security monitoring bot that tracks CVEs, CISA KEV e
 - Tracks feed health and per-channel delivery logs in SQLite
 - Generates weekly summaries
 - Provides slash commands for lookup, status, and subscriptions
+- Manages only its own ITSEC categories and channels in Discord
 
 ## Requirements
 
@@ -40,6 +41,10 @@ Update `.env`:
 DISCORD_TOKEN=your_discord_token_here
 GUILD_ID=
 ENABLE_CERT_SE=true
+AUTO_CREATE_CATEGORIES=true
+AUTO_CREATE_CHANNELS=true
+AUTO_SET_CHANNEL_PERMISSIONS=true
+ITSEC_LOG_READ_ONLY=true
 NVD_API_KEY=your_nvd_api_key_here
 LOG_LEVEL=INFO
 DB_PATH=itsec_cord_bot.db
@@ -180,25 +185,27 @@ In Discord Developer Portal:
 - `Send Messages`
 - `Embed Links`
 - `Read Message History`
-- `Manage Channels` (required only if you want auto channel/category creation)
+- `Manage Channels` (required only if `AUTO_CREATE_CATEGORIES`, `AUTO_CREATE_CHANNELS`, or `AUTO_SET_CHANNEL_PERMISSIONS` are enabled)
 
 ## Channel Structure
 
-On startup (when a guild is resolved), the bot creates or uses channels under one category:
+On startup, the bot creates or reuses only its own ITSEC categories and channels. Community, onboarding, and social channels are expected to be created manually outside the bot.
 
-- `cve-critical`
-- `cve-high`
-- `security-news`
-- `cert-se-alerts`
-- `vendor-microsoft`
-- `vendor-linux`
-- `vendor-google`
-- `vendor-cisco`
-- `vendor-fortinet`
-- `vendor-vmware`
-- `weekly-summary`
-- `itsec-log`
-- `ask-itsec`
+Managed categories:
+
+- `ITSEC ALERTS`
+- `ITSEC NEWS`
+- `ITSEC VENDORS`
+- `ITSEC BOT`
+
+Managed channels:
+
+- `ITSEC ALERTS`: `cve-critical`, `cve-high`, `weekly-summary`
+- `ITSEC NEWS`: `security-news`, `cert-se-alerts` (if `ENABLE_CERT_SE=true`)
+- `ITSEC VENDORS`: `vendor-microsoft`, `vendor-linux`, `vendor-google`, `vendor-apple`, `vendor-cisco`, `vendor-fortinet`, `vendor-vmware`, `vendor-oracle`, `vendor-adobe`, `vendor-apache`, `vendor-nginx`, `vendor-openssl`, `vendor-docker`, `vendor-kubernetes`, `vendor-postgresql`, `vendor-mysql`
+- `ITSEC BOT`: `ask-itsec`, `itsec-log`
+
+Feed channels are intended to be read-only for normal users. `ask-itsec` is the main writable user-facing channel created by the bot.
 
 News routing behavior:
 
@@ -209,6 +216,13 @@ News routing behavior:
 CERT-SE opt-out:
 
 - Set `ENABLE_CERT_SE=false` in `.env` to disable CERT-SE feed ingestion and CERT-SE channel creation.
+
+Auto-create and permission settings:
+
+- Set `AUTO_CREATE_CATEGORIES=false` to reuse only existing managed categories.
+- Set `AUTO_CREATE_CHANNELS=false` to reuse only existing managed channels.
+- Set `AUTO_SET_CHANNEL_PERMISSIONS=false` to leave channel overwrites unchanged.
+- Set `ITSEC_LOG_READ_ONLY=false` if you want `itsec-log` to stay writable or staff-friendly.
 
 Major-vendor channels currently include:
 

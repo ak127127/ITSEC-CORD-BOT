@@ -9,7 +9,18 @@ import discord
 from bs4 import BeautifulSoup
 from discord.ext import commands
 
-from config import DEFAULT_CHANNELS, NEWS_VENDOR_MATCHERS, TZ_STOCKHOLM, get_optional_guild_id, get_setting
+from config import (
+    AUTO_CREATE_CATEGORIES,
+    AUTO_CREATE_CHANNELS,
+    AUTO_SET_CHANNEL_PERMISSIONS,
+    ITSEC_MANAGED_STRUCTURE,
+    MANAGED_CATEGORY_NAMES,
+    MANAGED_CHANNEL_NAMES,
+    NEWS_VENDOR_MATCHERS,
+    TZ_STOCKHOLM,
+    get_optional_guild_id,
+    get_setting,
+)
 from cve_fetcher import CVEFetcher
 from database import Database
 from news_fetcher import NewsFetcher
@@ -88,57 +99,171 @@ class ItSecCordBot(commands.Bot):
             return self.get_guild(guild_id)
         return self.guilds[0] if self.guilds else None
 
-    async def _ensure_channel_structure(self, guild: discord.Guild):
-        main_category = discord.utils.get(guild.categories, name="ITSEC-CORD-BOT")
-        if not main_category:
-            main_category = await guild.create_category("ITSEC-CORD-BOT")
+    @staticmethod
+    def is_managed_category(category_name: str | None) -> bool:
+        return bool(category_name and category_name in MANAGED_CATEGORY_NAMES)
 
-        vendor_category = discord.utils.get(guild.categories, name="Vendors")
-        if not vendor_category:
-            vendor_category = await guild.create_category("Vendors")
+    @staticmethod
+    def is_managed_channel(channel_name: str | None) -> bool:
+        return bool(channel_name and channel_name in MANAGED_CHANNEL_NAMES)
 
-        top_uncategorized_order: list[str] = []
+    async def ensure_category(self, guild: discord.Guild, category_name: str) -> discord.CategoryChannel | None:
+        category = discord.utils.get(guild.categories, name=category_name)
+        if category:
+            logger.info("Reused category %s", category_name)
+            return category
+
+        if not AUTO_CREATE_CATEGORIES:
+            logger.info("Skipped category %s because AUTO_CREATE_CATEGORIES=false", category_name)
+            return None
 
         try:
-            for key, channel_name in DEFAULT_CHANNELS.items():
-                channel = discord.utils.get(guild.text_channels, name=channel_name)
+            category = await guild.create_category(category_name)
+            logger.info("Created category %s", category_name)
+            return category
+        except discord.Forbidden:
+            logger.warning("Missing permission to create category %s", category_name)
+        except discord.HTTPException as exc:
+            logger.warning("Failed to create category %s: %s", category_name, exc)
+        return None
 
-                # Keep these visible at the top of Discord's default text channel section.
-                if key in {"cert_se", "news"}:
-                    target_category = None
-                    top_uncategorized_order.append(key)
-                elif key.startswith("vendor_"):
-                    target_category = vendor_category
+    async def apply_read_only_overwrites(self, channel: discord.TextChannel):
+        if not AUTO_SET_CHANNEL_PERMISSIONS:
+            logger.info("Skipped permission updates for %s because AUTO_SET_CHANNEL_PERMISSIONS=false", channel.name)
+            return
+
+        bot_member = channel.guild.me or (self.user and channel.guild.get_member(self.user.id))
+        overwrites = {
+            channel.guild.default_role: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=False,
+                create_public_threads=False,
+                create_private_threads=False,
+                send_messages_in_threads=False,
+            ),
+        }
+        if bot_member:
+            # The bot needs to post alerts and keep embeds/history visible even when the channel is read-only.
+            overwrites[bot_member] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True,
+            )
+
+        await channel.edit(overwrites=overwrites)
+        logger.info("Applied read-only overwrites to %s", channel.name)
+
+    async def apply_writable_overwrites(self, channel: discord.TextChannel):
+        if not AUTO_SET_CHANNEL_PERMISSIONS:
+            logger.info("Skipped permission updates for %s because AUTO_SET_CHANNEL_PERMISSIONS=false", channel.name)
+            return
+
+        bot_member = channel.guild.me or (self.user and channel.guild.get_member(self.user.id))
+        overwrites = {
+            channel.guild.default_role: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                create_public_threads=True,
+                create_private_threads=True,
+                send_messages_in_threads=True,
+            ),
+        }
+        if bot_member:
+            overwrites[bot_member] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True,
+            )
+
+        await channel.edit(overwrites=overwrites)
+        logger.info("Applied writable overwrites to %s", channel.name)
+
+    async def ensure_text_channel(
+        self,
+        guild: discord.Guild,
+        channel_name: str,
+        category: discord.CategoryChannel | None,
+        read_only: bool,
+    ) -> discord.TextChannel | None:
+        channel = discord.utils.get(guild.text_channels, name=channel_name)
+        if channel:
+            logger.info("Reused channel %s", channel_name)
+            if category and channel.category != category:
+                await channel.edit(category=category)
+                logger.info("Moved channel %s into %s", channel_name, category.name)
+            if AUTO_SET_CHANNEL_PERMISSIONS:
+                if read_only:
+                    await self.apply_read_only_overwrites(channel)
                 else:
-                    target_category = main_category
+                    await self.apply_writable_overwrites(channel)
+            return channel
 
-                if not channel:
-                    channel = await guild.create_text_channel(channel_name, category=target_category)
-                elif channel.category != target_category:
-                    await channel.edit(category=target_category)
+        if not AUTO_CREATE_CHANNELS:
+            logger.info("Skipped channel %s because AUTO_CREATE_CHANNELS=false", channel_name)
+            return None
 
-                self.channel_map[key] = channel
+        if category is None:
+            logger.info("Skipped channel %s because its managed category is unavailable", channel_name)
+            return None
 
-            desired_top_channels = [
-                self.channel_map[key]
-                for key in top_uncategorized_order
-                if key in self.channel_map and self.channel_map[key].category is None
-            ]
-            other_uncategorized = [
-                ch
-                for ch in sorted(guild.text_channels, key=lambda c: c.position)
-                if ch.category is None and ch not in desired_top_channels
-            ]
+        try:
+            channel = await guild.create_text_channel(channel_name, category=category)
+            logger.info("Created channel %s in %s", channel_name, category.name)
+            if AUTO_SET_CHANNEL_PERMISSIONS:
+                if read_only:
+                    await self.apply_read_only_overwrites(channel)
+                else:
+                    await self.apply_writable_overwrites(channel)
+            return channel
+        except discord.Forbidden:
+            logger.warning("Missing permission to create channel %s", channel_name)
+        except discord.HTTPException as exc:
+            logger.warning("Failed to create channel %s: %s", channel_name, exc)
+        return None
 
-            # Re-apply all uncategorized positions in one deterministic pass.
-            for index, channel in enumerate(desired_top_channels + other_uncategorized):
-                await channel.edit(category=None, position=index)
+    async def _ensure_channel_structure(self, guild: discord.Guild):
+        try:
+            for category_name, channel_definitions in self._managed_category_index().items():
+                category = await self.ensure_category(guild, category_name)
+                for channel_definition in channel_definitions:
+                    if not channel_definition.get("enabled", True):
+                        continue
+
+                    channel = await self.ensure_text_channel(
+                        guild=guild,
+                        channel_name=channel_definition["name"],
+                        category=category,
+                        read_only=bool(channel_definition["read_only"]),
+                    )
+                    if channel:
+                        self.channel_map[channel_definition["key"]] = channel
 
         except discord.Forbidden:
             logger.warning(
-                "Missing 'Manage Channels' permission, cannot enforce category/channel order in guild %s",
+                "Missing 'Manage Channels' permission, cannot enforce ITSEC channel structure in guild %s",
                 guild.id,
             )
+
+    @staticmethod
+    def _managed_category_index() -> dict[str, list[dict[str, Any]]]:
+        index: dict[str, list[dict[str, Any]]] = {}
+        for section in ITSEC_MANAGED_STRUCTURE:
+            category_name = section["category_name"]
+            index.setdefault(category_name, [])
+            for channel in section["channels"]:
+                if not channel.get("enabled", True):
+                    continue
+                index[category_name].append({
+                    "name": channel["name"],
+                    "key": channel["key"],
+                    "read_only": channel["read_only"],
+                    "enabled": True,
+                })
+        for definitions in index.values():
+            definitions.sort(key=lambda item: item["name"])
+        return index
 
     async def log_message(self, message: str):
         logger.info(message)
