@@ -132,7 +132,15 @@ class ItSecCordBot(commands.Bot):
             logger.info("Skipped permission updates for %s because AUTO_SET_CHANNEL_PERMISSIONS=false", channel.name)
             return
 
-        bot_member = channel.guild.me or (self.user and channel.guild.get_member(self.user.id))
+        bot_member = await self._resolve_bot_member(channel.guild)
+        if not bot_member:
+            logger.warning(
+                "Could not resolve bot member in guild %s; skipping permission update for %s to avoid lockout",
+                channel.guild.id,
+                channel.name,
+            )
+            return
+
         overwrites = {
             channel.guild.default_role: discord.PermissionOverwrite(
                 view_channel=True,
@@ -141,15 +149,14 @@ class ItSecCordBot(commands.Bot):
                 create_private_threads=False,
                 send_messages_in_threads=False,
             ),
-        }
-        if bot_member:
             # The bot needs to post alerts and keep embeds/history visible even when the channel is read-only.
-            overwrites[bot_member] = discord.PermissionOverwrite(
+            bot_member: discord.PermissionOverwrite(
                 view_channel=True,
                 send_messages=True,
                 embed_links=True,
                 read_message_history=True,
-            )
+            ),
+        }
 
         await channel.edit(overwrites=overwrites)
         logger.info("Applied read-only overwrites to %s", channel.name)
@@ -159,7 +166,15 @@ class ItSecCordBot(commands.Bot):
             logger.info("Skipped permission updates for %s because AUTO_SET_CHANNEL_PERMISSIONS=false", channel.name)
             return
 
-        bot_member = channel.guild.me or (self.user and channel.guild.get_member(self.user.id))
+        bot_member = await self._resolve_bot_member(channel.guild)
+        if not bot_member:
+            logger.warning(
+                "Could not resolve bot member in guild %s; skipping permission update for %s to avoid lockout",
+                channel.guild.id,
+                channel.name,
+            )
+            return
+
         overwrites = {
             channel.guild.default_role: discord.PermissionOverwrite(
                 view_channel=True,
@@ -168,17 +183,33 @@ class ItSecCordBot(commands.Bot):
                 create_private_threads=True,
                 send_messages_in_threads=True,
             ),
-        }
-        if bot_member:
-            overwrites[bot_member] = discord.PermissionOverwrite(
+            bot_member: discord.PermissionOverwrite(
                 view_channel=True,
                 send_messages=True,
                 embed_links=True,
                 read_message_history=True,
-            )
+            ),
+        }
 
         await channel.edit(overwrites=overwrites)
         logger.info("Applied writable overwrites to %s", channel.name)
+
+    async def _resolve_bot_member(self, guild: discord.Guild) -> discord.Member | None:
+        if guild.me:
+            return guild.me
+        if self.user:
+            cached = guild.get_member(self.user.id)
+            if cached:
+                return cached
+            try:
+                return await guild.fetch_member(self.user.id)
+            except discord.NotFound:
+                logger.warning("Bot user %s is not a guild member in %s", self.user.id, guild.id)
+            except discord.Forbidden:
+                logger.warning("Missing permission to fetch bot member in guild %s", guild.id)
+            except discord.HTTPException as exc:
+                logger.warning("Failed to fetch bot member in guild %s: %s", guild.id, exc)
+        return None
 
     async def ensure_text_channel(
         self,
@@ -270,6 +301,8 @@ class ItSecCordBot(commands.Bot):
         log_channel = self.channel_map.get("log")
         if log_channel:
             await log_channel.send(f"`[ITSEC]` {message}")
+            return
+        logger.warning("No managed log channel resolved; skipped Discord log message")
 
     @staticmethod
     def _severity_emoji(severity: str) -> str:
