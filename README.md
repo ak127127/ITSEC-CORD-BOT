@@ -48,6 +48,8 @@ AUTO_SET_CHANNEL_PERMISSIONS=true
 ITSEC_LOG_READ_ONLY=true
 NVD_API_KEY=your_nvd_api_key_here
 CVE_MAX_PUBLISHED_AGE_DAYS=30
+NEWS_MAX_PUBLISHED_AGE_HOURS=36
+NEWS_INCLUDE_UNDATED_ENTRIES=false
 LOG_LEVEL=INFO
 DB_PATH=itsec_cord_bot.db
 ```
@@ -279,6 +281,10 @@ Weekly summary fields:
 
 - Too many older CVE IDs (for example many `CVE-2025-*`) in alerts
   - Lower `CVE_MAX_PUBLISHED_AGE_DAYS` in `.env` (for example `14`) and restart the bot.
+
+- Too many old or noisy news items
+  - Lower `NEWS_MAX_PUBLISHED_AGE_HOURS` in `.env` (for example `24`) and keep `NEWS_INCLUDE_UNDATED_ENTRIES=false`.
+  - Restart the bot after changing `.env`.
 
 - `TypeError: can't subtract offset-naive and offset-aware datetimes`
   - Pull latest code and restart the service.
