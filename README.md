@@ -2,6 +2,14 @@
 
 ITSEC-CORD-BOT is a Discord security monitoring bot that tracks CVEs, CISA KEV entries, and security news feeds.
 
+## Start Here
+
+Choose one path:
+
+- New to Discord bots: follow `Beginner Quick Start (10 minutes)` below.
+- Running on a VPS/service: jump to `Advanced: Run as a systemd Service (Linux VPS)`.
+- Already running the bot: use `Update on VPS` for routine upgrades.
+
 ## Features
 
 - Fetches recently modified CVEs from NVD, filtered to recently published CVEs
@@ -24,7 +32,9 @@ ITSEC-CORD-BOT is a Discord security monitoring bot that tracks CVEs, CISA KEV e
 - Discord bot token
 - Optional: NVD API key (recommended for better rate limits)
 
-## Quick Start (Local)
+## Beginner Quick Start (10 minutes)
+
+This path is enough to get the bot online in one server.
 
 ```bash
 git clone https://github.com/ak127127/ITSEC-CORD-BOT.git
@@ -36,22 +46,20 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Update `.env`:
+Set only these values in `.env` first (everything else can stay default):
 
 ```dotenv
 DISCORD_TOKEN=your_discord_token_here
-GUILD_ID=
-ENABLE_CERT_SE=true
-AUTO_CREATE_CATEGORIES=true
-AUTO_CREATE_CHANNELS=true
-AUTO_SET_CHANNEL_PERMISSIONS=true
-ITSEC_LOG_READ_ONLY=true
 NVD_API_KEY=your_nvd_api_key_here
+GUILD_ID=
+```
+
+Optional hardening for noisy feeds:
+
+```dotenv
 CVE_MAX_PUBLISHED_AGE_DAYS=30
 NEWS_MAX_PUBLISHED_AGE_HOURS=36
 NEWS_INCLUDE_UNDATED_ENTRIES=false
-LOG_LEVEL=INFO
-DB_PATH=itsec_cord_bot.db
 ```
 
 Run:
@@ -61,7 +69,15 @@ source .venv/bin/activate
 python bot.py
 ```
 
-## OS-Specific Package Install
+Then in Discord test:
+
+- `/itsec status`
+- `/itsec weekly`
+- `/itsec latest 5`
+
+If this works, continue to advanced sections when you are ready.
+
+## Advanced: OS-Specific Package Install
 
 Use one of the following before setup:
 
@@ -79,7 +95,7 @@ sudo dnf update -y
 sudo dnf install -y git python3 python3-pip
 ```
 
-## Run as a systemd Service (Linux VPS)
+## Advanced: Run as a systemd Service (Linux VPS)
 
 1. Clone and set up the app in a stable path (example: `/opt/ITSEC-CORD-BOT`).
 2. Create a service file:
@@ -118,7 +134,7 @@ sudo systemctl status itsec-cord-bot --no-pager
 sudo journalctl -u itsec-cord-bot -f
 ```
 
-## Update on VPS
+## Advanced: Update on VPS
 
 ```bash
 cd /opt/ITSEC-CORD-BOT
@@ -128,7 +144,7 @@ pip install -r requirements.txt
 sudo systemctl restart itsec-cord-bot
 ```
 
-## Database Health Checks
+## Advanced: Database Health Checks
 
 Install SQLite CLI if needed:
 
