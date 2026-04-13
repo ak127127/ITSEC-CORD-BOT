@@ -256,6 +256,32 @@ class Database:
         await cursor.close()
         return row[0] if row else None
 
+    async def is_news_published(self, item_url: str, news_fingerprint: Optional[str]) -> bool:
+        conn = self._require_conn()
+        if self.has_news_fingerprint and news_fingerprint:
+            cursor = await conn.execute(
+                """
+                SELECT 1
+                FROM published_news
+                WHERE item_url = ? OR news_fingerprint = ?
+                LIMIT 1
+                """,
+                (item_url, news_fingerprint),
+            )
+        else:
+            cursor = await conn.execute(
+                """
+                SELECT 1
+                FROM published_news
+                WHERE item_url = ?
+                LIMIT 1
+                """,
+                (item_url,),
+            )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return row is not None
+
     async def mark_news_as_published(
         self,
         item_url: str,
@@ -339,6 +365,25 @@ class Database:
         await cursor.close()
         return [(str(row[0]), str(row[1])) for row in rows]
 
+    async def get_feed_health_summary(self) -> dict[str, int]:
+        conn = self._require_conn()
+        cursor = await conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total_sources,
+                SUM(CASE WHEN datetime(last_error_at) >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS error_sources_24h,
+                SUM(CASE WHEN datetime(last_ok_at) >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS ok_sources_24h
+            FROM feed_health
+            """
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return {
+            "total_sources": (row["total_sources"] or 0) if row else 0,
+            "error_sources_24h": (row["error_sources_24h"] or 0) if row else 0,
+            "ok_sources_24h": (row["ok_sources_24h"] or 0) if row else 0,
+        }
+
     async def get_weekly_stats(self) -> dict[str, int]:
         conn = self._require_conn()
         cursor = await conn.execute(
@@ -346,8 +391,9 @@ class Database:
             SELECT
                 SUM(CASE WHEN cvss >= 9.0 THEN 1 ELSE 0 END) AS critical_count,
                 SUM(CASE WHEN cvss >= 7.0 AND cvss < 9.0 THEN 1 ELSE 0 END) AS high_count,
-                SUM(CASE WHEN is_kev = 1 THEN 1 ELSE 0 END) AS kev_count,
-                SUM(CASE WHEN lower(exploit_status) IN ('active', 'aktiv') THEN 1 ELSE 0 END) AS active_exploit_count
+                SUM(CASE WHEN is_kev = 1 THEN 1 ELSE 0 END) AS kev_tagged_count,
+                SUM(CASE WHEN lower(exploit_status) IN ('active', 'aktiv') THEN 1 ELSE 0 END) AS active_exploit_count,
+                SUM(CASE WHEN lower(exploit_status) = 'poc' THEN 1 ELSE 0 END) AS poc_count
             FROM published_cves
             WHERE datetime(fetched_at) >= datetime('now', '-7 day')
             """
@@ -358,31 +404,17 @@ class Database:
             return {
                 "critical_count": 0,
                 "high_count": 0,
-                "kev_count": 0,
+                "kev_tagged_count": 0,
                 "active_exploit_count": 0,
+                "poc_count": 0,
             }
         return {
             "critical_count": row["critical_count"] or 0,
             "high_count": row["high_count"] or 0,
-            "kev_count": row["kev_count"] or 0,
+            "kev_tagged_count": row["kev_tagged_count"] or 0,
             "active_exploit_count": row["active_exploit_count"] or 0,
+            "poc_count": row["poc_count"] or 0,
         }
-
-    async def get_weekly_news_headlines(self, limit: int = 3) -> list[dict[str, Any]]:
-        conn = self._require_conn()
-        cursor = await conn.execute(
-            """
-            SELECT title, item_url, source_name
-            FROM published_news
-            WHERE datetime(fetched_at) >= datetime('now', '-7 day')
-            ORDER BY fetched_at DESC
-            LIMIT ?
-            """,
-            (max(1, min(limit, 10)),),
-        )
-        rows = await cursor.fetchall()
-        await cursor.close()
-        return [dict(row) for row in rows]
 
     async def close(self):
         if self.connection:

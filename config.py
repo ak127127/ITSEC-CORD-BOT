@@ -281,8 +281,12 @@ NEWS_FEEDS = [
     "https://www.cisa.gov/cybersecurity-advisories/all.xml",
     "https://isc.sans.edu/rssfeed.xml",
     "https://googleprojectzero.blogspot.com/feeds/posts/default?alt=rss",
+    "https://security.googleblog.com/atom.xml",
     "https://msrc.microsoft.com/blog/feed",
     "https://www.rapid7.com/blog/rss/",
+    "https://blog.talosintelligence.com/rss/",
+    "https://unit42.paloaltonetworks.com/feed/",
+    "https://www.schneier.com/feed/atom/",
 ]
 
 if ENABLE_CERT_SE:

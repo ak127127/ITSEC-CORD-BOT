@@ -16,11 +16,13 @@ class BotScheduler:
     def __init__(
         self,
         cve_job: Callable[[], Awaitable[None]],
+        kev_job: Callable[[], Awaitable[None]],
         news_job: Callable[[], Awaitable[None]],
         weekly_job: Callable[[], Awaitable[None]],
     ):
         self.scheduler = AsyncIOScheduler(timezone=TZ_STOCKHOLM)
         self.cve_job = cve_job
+        self.kev_job = kev_job
         self.news_job = news_job
         self.weekly_job = weekly_job
 
@@ -35,7 +37,7 @@ class BotScheduler:
             coalesce=True,
         )
         self.scheduler.add_job(
-            self.cve_job,
+            self.kev_job,
             IntervalTrigger(hours=6),
             id="kev_refresh",
             replace_existing=True,

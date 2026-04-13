@@ -4,16 +4,17 @@ ITSEC-CORD-BOT is a Discord security monitoring bot that tracks CVEs, CISA KEV e
 
 ## Features
 
-- Fetches recent CVEs from NVD
+- Fetches recently modified CVEs from NVD
 - Enriches CVEs with CISA KEV data
 - Posts alerts to Discord channels
 - Pulls security news from RSS feeds
 - Duplicates major-vendor news into dedicated vendor channels
 - Routes CERT-SE posts to a dedicated CERT-SE channel
 - Uses fingerprint-based cross-source deduplication for news
+- Uses delivery-safe persistence (items are stored as published only after successful Discord delivery)
 - Sends subscription match notifications via DM
 - Tracks feed health and per-channel delivery logs in SQLite
-- Generates weekly summaries
+- Generates weekly CVE-focused summaries (without headline rollups)
 - Provides slash commands for lookup, status, and subscriptions
 - Manages only its own ITSEC categories and channels in Discord
 
@@ -170,7 +171,7 @@ sqlite3 itsec_cord_bot.db "SELECT news_fingerprint, COUNT(*) c FROM published_ne
 - `/itsec unwatch <vendor>`
 - `/itsec mysubs`
 - `/itsec weekly`
-- `/itsec status`
+- `/itsec status` (includes feed health summary for the last 24h)
 - `/itsec_help`
 - `/news_latest`
 
@@ -250,12 +251,22 @@ Configured RSS/Atom feeds:
 - `https://www.bleepingcomputer.com/feed/`
 - `https://therecord.media/feed`
 - `https://krebsonsecurity.com/feed/`
-- `https://www.cert.se/feed/`
 - `https://www.cisa.gov/cybersecurity-advisories/all.xml`
 - `https://isc.sans.edu/rssfeed.xml`
 - `https://googleprojectzero.blogspot.com/feeds/posts/default?alt=rss`
+- `https://security.googleblog.com/atom.xml`
 - `https://msrc.microsoft.com/blog/feed`
 - `https://www.rapid7.com/blog/rss/`
+- `https://blog.talosintelligence.com/rss/`
+- `https://unit42.paloaltonetworks.com/feed/`
+- `https://www.schneier.com/feed/atom/`
+- `https://www.cert.se/feed/` (only when `ENABLE_CERT_SE=true`)
+
+Weekly summary fields:
+
+- `Active exploits (KEV-linked)`: CVEs in the last 7 days where exploit status is `Active`/`aktiv`
+- `Public PoCs observed`: CVEs in the last 7 days where exploit status is `PoC`
+- `KEV-tagged CVEs (local feed)`: CVEs in the local DB from the last 7 days tagged with CISA KEV
 
 ## Security Notes
 

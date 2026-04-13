@@ -78,6 +78,7 @@ class ItSecCordBot(commands.Bot):
 
         self.scheduler = BotScheduler(
             cve_job=self.run_cve_cycle,
+            kev_job=self.run_kev_refresh,
             news_job=self.run_news_cycle,
             weekly_job=self.post_weekly_summary,
         )
@@ -451,16 +452,30 @@ class ItSecCordBot(commands.Bot):
 
             message = self.format_cve_alert(cve)
             channel = self.channel_map.get(channel_key)
+            delivered = False
             if channel:
                 should_ping_here = (
                     cve.get("exploit_status") == "Active"
                     and cve.get("is_broad_impact")
                     and "no workaround" in (cve.get("summary", "").lower() + cve.get("action", "").lower())
                 )
-                if should_ping_here and channel_key == "critical":
-                    await channel.send("@here")
-                await channel.send(message)
-                await self.db.record_delivery("cve", cve["cve_id"], channel_key)
+                try:
+                    if should_ping_here and channel_key == "critical":
+                        await channel.send("@here")
+                    await channel.send(message)
+                    await self.db.record_delivery("cve", cve["cve_id"], channel_key)
+                    delivered = True
+                except discord.HTTPException as exc:
+                    logger.warning(
+                        "Failed posting CVE %s to channel %s: %s",
+                        cve.get("cve_id"),
+                        channel_key,
+                        exc,
+                    )
+
+            if not delivered:
+                logger.warning("No successful delivery for CVE %s; will retry later", cve.get("cve_id"))
+                continue
 
             inserted = await self.db.insert_cve_if_new(cve, posted_channel=channel_key)
             if inserted:
@@ -484,6 +499,12 @@ class ItSecCordBot(commands.Bot):
         if sent_count:
             await self.log_message(f"CVE cycle complete. New alerts: {sent_count}")
 
+    async def run_kev_refresh(self):
+        logger.info("Starting KEV refresh cycle")
+        kev_ids = await asyncio.to_thread(self.cve_fetcher.fetch_cisa_kev_set)
+        await self.db.set_last_fetch("kev")
+        await self.log_message(f"KEV refresh complete. Catalog size: {len(kev_ids)}")
+
     async def run_news_cycle(self):
         logger.info("Starting news cycle")
         items = await asyncio.to_thread(self.news_fetcher.fetch_recent_news, 30)
@@ -500,25 +521,23 @@ class ItSecCordBot(commands.Bot):
 
         sent_count = 0
         news_channel = self.channel_map.get("news")
-        cert_se_channel = self.channel_map.get("cert_se")
         for item in items:
-            inserted = await self.db.mark_news_as_published(
-                item_url=item["url"],
-                title=item.get("title", "Untitled"),
-                source_name=item.get("source_name", "Unknown"),
-                news_fingerprint=item.get("news_fingerprint"),
-                published_at=item.get("published_at"),
-            )
-            if not inserted:
+            already = await self.db.is_news_published(item["url"], item.get("news_fingerprint"))
+            if already:
                 continue
-            sent_count += 1
+
             formatted = self.format_news_alert(item)
             posted_channel_ids: set[int] = set()
+            delivered = False
 
             if news_channel:
-                await news_channel.send(formatted)
-                posted_channel_ids.add(news_channel.id)
-                await self.db.record_delivery("news", item["url"], "news")
+                try:
+                    await news_channel.send(formatted)
+                    posted_channel_ids.add(news_channel.id)
+                    await self.db.record_delivery("news", item["url"], "news")
+                    delivered = True
+                except discord.HTTPException as exc:
+                    logger.warning("Failed posting news item %s to news channel: %s", item.get("url"), exc)
 
             source_name = (item.get("source_name") or "").lower()
             extra_keys: set[str] = set()
@@ -531,9 +550,33 @@ class ItSecCordBot(commands.Bot):
                 channel = self.channel_map.get(channel_key)
                 if not channel or channel.id in posted_channel_ids:
                     continue
-                await channel.send(formatted)
-                posted_channel_ids.add(channel.id)
-                await self.db.record_delivery("news", item["url"], channel_key)
+                try:
+                    await channel.send(formatted)
+                    posted_channel_ids.add(channel.id)
+                    await self.db.record_delivery("news", item["url"], channel_key)
+                    delivered = True
+                except discord.HTTPException as exc:
+                    logger.warning(
+                        "Failed posting news item %s to channel %s: %s",
+                        item.get("url"),
+                        channel_key,
+                        exc,
+                    )
+
+            if not delivered:
+                logger.warning("No successful delivery for news item %s; will retry later", item.get("url"))
+                continue
+
+            inserted = await self.db.mark_news_as_published(
+                item_url=item["url"],
+                title=item.get("title", "Untitled"),
+                source_name=item.get("source_name", "Unknown"),
+                news_fingerprint=item.get("news_fingerprint"),
+                published_at=item.get("published_at"),
+            )
+            if not inserted:
+                continue
+            sent_count += 1
 
             subscription_blob = " ".join(
                 [
@@ -554,26 +597,23 @@ class ItSecCordBot(commands.Bot):
 
     async def generate_weekly_summary_text(self) -> str:
         stats = await self.db.get_weekly_stats()
-        headlines = await self.db.get_weekly_news_headlines(limit=3)
 
         trend = "Calm week overall."
-        if stats["critical_count"] >= 5 or stats["active_exploit_count"] >= 2:
-            trend = "High activity, especially in exploitability risk."
+        if (
+            stats["critical_count"] >= 25
+            or stats["active_exploit_count"] >= 1
+            or stats["poc_count"] >= 40
+        ):
+            trend = "High activity with elevated exploitability risk."
 
         lines = [
             "📋 **Weekly Summary**",
             f"- Critical CVEs: {stats['critical_count']}",
             f"- High CVEs: {stats['high_count']}",
-            f"- Active exploits: {stats['active_exploit_count']}",
-            f"- New CISA KEV entries: {stats['kev_count']}",
-            "- Notable news:",
+            f"- Active exploits (KEV-linked): {stats['active_exploit_count']}",
+            f"- Public PoCs observed: {stats['poc_count']}",
+            f"- KEV-tagged CVEs (local feed): {stats['kev_tagged_count']}",
         ]
-
-        if headlines:
-            for item in headlines:
-                lines.append(f"  - {item['title']} ({item['source_name']})")
-        else:
-            lines.append("  - No standout headlines in the news feed this week.")
 
         lines.append(f"- Trend: {trend}")
         return "\n".join(lines)
@@ -590,6 +630,7 @@ class ItSecCordBot(commands.Bot):
         kev_last = await self.db.get_last_fetch("kev")
         news_last = await self.db.get_last_fetch("news")
         weekly_last = await self.db.get_last_fetch("weekly")
+        feed_health = await self.db.get_feed_health_summary()
         uptime = datetime.now(tz=TZ_STOCKHOLM) - self.started_at
 
         return (
@@ -598,7 +639,8 @@ class ItSecCordBot(commands.Bot):
             f"- Last CVE fetch: `{cve_last or 'never'}`\n"
             f"- Last KEV fetch: `{kev_last or 'never'}`\n"
             f"- Last news fetch: `{news_last or 'never'}`\n"
-            f"- Last weekly summary: `{weekly_last or 'never'}`"
+            f"- Last weekly summary: `{weekly_last or 'never'}`\n"
+            f"- Feed health (24h): `{feed_health['ok_sources_24h']}` ok / `{feed_health['error_sources_24h']}` errors across `{feed_health['total_sources']}` sources"
         )
 
 

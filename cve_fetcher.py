@@ -121,12 +121,12 @@ class CVEFetcher:
         return "None"
 
     def fetch_recent_nvd_cves(self, hours: int = 24) -> list[dict[str, Any]]:
-        """Fetch recently published/updated CVEs from NVD."""
+        """Fetch recently modified CVEs from NVD."""
         now_utc = datetime.now(tz=timezone.utc)
         start_utc = now_utc - timedelta(hours=hours)
         params = {
-            "pubStartDate": start_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "pubEndDate": now_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "lastModStartDate": start_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "lastModEndDate": now_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
             "resultsPerPage": 200,
         }
         try:
@@ -143,7 +143,8 @@ class CVEFetcher:
             if not parsed_item:
                 continue
 
-            if not self._is_recent(parsed_item.get("published_at"), hours):
+            recent_marker = parsed_item.get("last_modified") or parsed_item.get("published_at")
+            if not self._is_recent(recent_marker, hours):
                 continue
 
             parsed.append(parsed_item)
@@ -156,7 +157,8 @@ class CVEFetcher:
         if not cve_id:
             return None
 
-        published_at = cve.get("published") or cve.get("lastModified")
+        published_at = cve.get("published")
+        last_modified = cve.get("lastModified")
         description = self._extract_description(cve)
         cvss = self._extract_cvss(cve)
         severity = self._severity_from_cvss(cvss)
@@ -177,6 +179,7 @@ class CVEFetcher:
             "vendor_url": refs[0] if refs else f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
             "exploit_url": refs[0] if refs else None,
             "published_at": published_at,
+            "last_modified": last_modified,
             "is_broad_impact": self._is_broad_impact(cve, description, affected),
         }
 
