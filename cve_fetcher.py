@@ -6,7 +6,7 @@ from typing import Any
 
 import requests
 
-from config import BROAD_IMPACT_KEYWORDS, get_setting
+from config import BROAD_IMPACT_KEYWORDS, get_int_setting, get_setting
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ class CVEFetcher:
     def __init__(self):
         self.session = requests.Session()
         self.nvd_api_key = get_setting("NVD_API_KEY")
+        self.max_published_age_days = max(1, get_int_setting("CVE_MAX_PUBLISHED_AGE_DAYS", 30))
         if self.nvd_api_key:
             self.session.headers.update({"apiKey": self.nvd_api_key})
 
@@ -41,6 +42,13 @@ class CVEFetcher:
             parsed = parsed.replace(tzinfo=timezone.utc)
         now = datetime.now(tz=timezone.utc)
         return now - parsed <= timedelta(hours=hours)
+
+    def _is_within_published_window(self, date_str: str | None) -> bool:
+        parsed = self._parse_date(date_str)
+        if not parsed:
+            return False
+        now = datetime.now(tz=timezone.utc)
+        return now - parsed <= timedelta(days=self.max_published_age_days)
 
     @staticmethod
     def _extract_description(cve: dict[str, Any]) -> str:
@@ -145,6 +153,10 @@ class CVEFetcher:
 
             recent_marker = parsed_item.get("last_modified") or parsed_item.get("published_at")
             if not self._is_recent(recent_marker, hours):
+                continue
+
+            # Keep modified polling, but avoid flooding with very old CVEs that got metadata edits.
+            if not self._is_within_published_window(parsed_item.get("published_at")):
                 continue
 
             parsed.append(parsed_item)

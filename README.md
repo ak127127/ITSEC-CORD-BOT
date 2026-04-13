@@ -4,7 +4,7 @@ ITSEC-CORD-BOT is a Discord security monitoring bot that tracks CVEs, CISA KEV e
 
 ## Features
 
-- Fetches recently modified CVEs from NVD
+- Fetches recently modified CVEs from NVD, filtered to recently published CVEs
 - Enriches CVEs with CISA KEV data
 - Posts alerts to Discord channels
 - Pulls security news from RSS feeds
@@ -47,6 +47,7 @@ AUTO_CREATE_CHANNELS=true
 AUTO_SET_CHANNEL_PERMISSIONS=true
 ITSEC_LOG_READ_ONLY=true
 NVD_API_KEY=your_nvd_api_key_here
+CVE_MAX_PUBLISHED_AGE_DAYS=30
 LOG_LEVEL=INFO
 DB_PATH=itsec_cord_bot.db
 ```
@@ -275,6 +276,9 @@ Weekly summary fields:
 - Use `.env.example` as a template with placeholders.
 
 ## Troubleshooting
+
+- Too many older CVE IDs (for example many `CVE-2025-*`) in alerts
+  - Lower `CVE_MAX_PUBLISHED_AGE_DAYS` in `.env` (for example `14`) and restart the bot.
 
 - `TypeError: can't subtract offset-naive and offset-aware datetimes`
   - Pull latest code and restart the service.
