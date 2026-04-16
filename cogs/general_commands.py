@@ -15,11 +15,6 @@ class GeneralCommands(commands.Cog):
             "**ITSEC-CORD-BOT commands**\n"
             "- `/itsec cve CVE-YYYY-NNNN`\n"
             "- `/itsec latest [count]`\n"
-            "- `/itsec search [term]`\n"
-            "- `/itsec watch [vendor]`\n"
-            "- `/itsec unwatch [vendor]`\n"
-            "- `/itsec mysubs`\n"
-            "- `/itsec weekly`\n"
             "- `/itsec status`"
         )
         await interaction.response.send_message(text, ephemeral=True)

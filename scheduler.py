@@ -4,7 +4,6 @@ import logging
 from typing import Awaitable, Callable
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from config import TZ_STOCKHOLM
@@ -18,13 +17,11 @@ class BotScheduler:
         cve_job: Callable[[], Awaitable[None]],
         kev_job: Callable[[], Awaitable[None]],
         news_job: Callable[[], Awaitable[None]],
-        weekly_job: Callable[[], Awaitable[None]],
     ):
         self.scheduler = AsyncIOScheduler(timezone=TZ_STOCKHOLM)
         self.cve_job = cve_job
         self.kev_job = kev_job
         self.news_job = news_job
-        self.weekly_job = weekly_job
 
     def start(self):
         """Registrera alla jobb och starta schedulern."""
@@ -52,16 +49,8 @@ class BotScheduler:
             max_instances=1,
             coalesce=True,
         )
-        self.scheduler.add_job(
-            self.weekly_job,
-            CronTrigger(day_of_week="sun", hour=18, minute=0),
-            id="weekly_summary",
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-        )
         self.scheduler.start()
-        logger.info("Scheduler started with CVE/KEV/news/weekly jobs")
+        logger.info("Scheduler started with CVE/KEV/news jobs")
 
     def shutdown(self):
         if self.scheduler.running:

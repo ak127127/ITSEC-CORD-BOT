@@ -6,7 +6,7 @@ from typing import Any
 
 import requests
 
-from config import BROAD_IMPACT_KEYWORDS, get_int_setting, get_setting
+from config import BROAD_IMPACT_KEYWORDS, get_setting
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,6 @@ class CVEFetcher:
     def __init__(self):
         self.session = requests.Session()
         self.nvd_api_key = get_setting("NVD_API_KEY")
-        self.max_published_age_days = max(1, get_int_setting("CVE_MAX_PUBLISHED_AGE_DAYS", 30))
         if self.nvd_api_key:
             self.session.headers.update({"apiKey": self.nvd_api_key})
 
@@ -42,13 +41,6 @@ class CVEFetcher:
             parsed = parsed.replace(tzinfo=timezone.utc)
         now = datetime.now(tz=timezone.utc)
         return now - parsed <= timedelta(hours=hours)
-
-    def _is_within_published_window(self, date_str: str | None) -> bool:
-        parsed = self._parse_date(date_str)
-        if not parsed:
-            return False
-        now = datetime.now(tz=timezone.utc)
-        return now - parsed <= timedelta(days=self.max_published_age_days)
 
     @staticmethod
     def _extract_description(cve: dict[str, Any]) -> str:
@@ -129,12 +121,12 @@ class CVEFetcher:
         return "None"
 
     def fetch_recent_nvd_cves(self, hours: int = 24) -> list[dict[str, Any]]:
-        """Fetch recently modified CVEs from NVD."""
+        """Fetch recently published/updated CVEs from NVD."""
         now_utc = datetime.now(tz=timezone.utc)
         start_utc = now_utc - timedelta(hours=hours)
         params = {
-            "lastModStartDate": start_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            "lastModEndDate": now_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "pubStartDate": start_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "pubEndDate": now_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
             "resultsPerPage": 200,
         }
         try:
@@ -151,12 +143,7 @@ class CVEFetcher:
             if not parsed_item:
                 continue
 
-            recent_marker = parsed_item.get("last_modified") or parsed_item.get("published_at")
-            if not self._is_recent(recent_marker, hours):
-                continue
-
-            # Keep modified polling, but avoid flooding with very old CVEs that got metadata edits.
-            if not self._is_within_published_window(parsed_item.get("published_at")):
+            if not self._is_recent(parsed_item.get("published_at"), hours):
                 continue
 
             parsed.append(parsed_item)
@@ -169,8 +156,7 @@ class CVEFetcher:
         if not cve_id:
             return None
 
-        published_at = cve.get("published")
-        last_modified = cve.get("lastModified")
+        published_at = cve.get("published") or cve.get("lastModified")
         description = self._extract_description(cve)
         cvss = self._extract_cvss(cve)
         severity = self._severity_from_cvss(cvss)
@@ -191,7 +177,6 @@ class CVEFetcher:
             "vendor_url": refs[0] if refs else f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
             "exploit_url": refs[0] if refs else None,
             "published_at": published_at,
-            "last_modified": last_modified,
             "is_broad_impact": self._is_broad_impact(cve, description, affected),
         }
 

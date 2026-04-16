@@ -57,21 +57,6 @@ class ItSecCommands(commands.GroupCog, group_name="itsec", group_description="CV
             lines.append(self._format_cve_list_line(row))
         await interaction.response.send_message("\n".join(lines))
 
-    @app_commands.command(name="search", description="Search CVE history")
-    async def search(self, interaction: discord.Interaction, term: str):
-        await interaction.response.defer(thinking=True)
-        rows = await self.bot.db.search_cves(term, limit=10)
-        if not rows:
-            await interaction.followup.send(
-                f"No matches for `{term}` in local history.", ephemeral=True
-            )
-            return
-
-        lines = [f"**Matches for `{term}`**"]
-        for row in rows:
-            lines.append(self._format_cve_list_line(row))
-        await interaction.followup.send("\n".join(lines))
-
     async def cog_app_command_error(
         self,
         interaction: discord.Interaction,
@@ -83,29 +68,6 @@ class ItSecCommands(commands.GroupCog, group_name="itsec", group_description="CV
             await interaction.followup.send(text, ephemeral=True)
         else:
             await interaction.response.send_message(text, ephemeral=True)
-
-    @app_commands.command(name="watch", description="Subscribe to a vendor/product")
-    async def watch(self, interaction: discord.Interaction, vendor: str):
-        await self.bot.db.add_subscription(str(interaction.user.id), vendor)
-        await interaction.response.send_message(f"Subscription added for `{vendor.lower()}`.", ephemeral=True)
-
-    @app_commands.command(name="unwatch", description="Unsubscribe from a vendor/product")
-    async def unwatch(self, interaction: discord.Interaction, vendor: str):
-        await self.bot.db.remove_subscription(str(interaction.user.id), vendor)
-        await interaction.response.send_message(f"Subscription removed for `{vendor.lower()}`.", ephemeral=True)
-
-    @app_commands.command(name="mysubs", description="Show your subscriptions")
-    async def mysubs(self, interaction: discord.Interaction):
-        subs = await self.bot.db.get_user_subscriptions(str(interaction.user.id))
-        if not subs:
-            await interaction.response.send_message("You have no active subscriptions.", ephemeral=True)
-            return
-        await interaction.response.send_message("Your subscriptions: " + ", ".join(f"`{s}`" for s in subs), ephemeral=True)
-
-    @app_commands.command(name="weekly", description="Generate weekly summary now")
-    async def weekly(self, interaction: discord.Interaction):
-        summary = await self.bot.generate_weekly_summary_text()
-        await interaction.response.send_message(summary)
 
     @app_commands.command(name="status", description="Show bot status")
     async def status(self, interaction: discord.Interaction):

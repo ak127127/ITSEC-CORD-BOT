@@ -12,18 +12,16 @@ Choose one path:
 
 ## Features
 
-- Fetches recently modified CVEs from NVD, filtered to recently published CVEs
+- Fetches recent CVEs from NVD
 - Enriches CVEs with CISA KEV data
 - Posts alerts to Discord channels
 - Pulls security news from RSS feeds
 - Duplicates major-vendor news into dedicated vendor channels
 - Routes CERT-SE posts to a dedicated CERT-SE channel
 - Uses fingerprint-based cross-source deduplication for news
-- Uses delivery-safe persistence (items are stored as published only after successful Discord delivery)
 - Sends subscription match notifications via DM
 - Tracks feed health and per-channel delivery logs in SQLite
-- Generates weekly CVE-focused summaries (without headline rollups)
-- Provides slash commands for lookup, status, and subscriptions
+- Provides essential slash commands for lookup and status
 - Manages only its own ITSEC categories and channels in Discord
 
 ## Requirements
@@ -57,9 +55,7 @@ GUILD_ID=
 Optional hardening for noisy feeds:
 
 ```dotenv
-CVE_MAX_PUBLISHED_AGE_DAYS=30
-NEWS_MAX_PUBLISHED_AGE_HOURS=36
-NEWS_INCLUDE_UNDATED_ENTRIES=false
+# Keep defaults initially. Add only if you need to tune behavior later.
 ```
 
 Run:
@@ -72,7 +68,6 @@ python bot.py
 Then in Discord test:
 
 - `/itsec status`
-- `/itsec weekly`
 - `/itsec latest 5`
 
 If this works, continue to advanced sections when you are ready.
@@ -185,12 +180,7 @@ sqlite3 itsec_cord_bot.db "SELECT news_fingerprint, COUNT(*) c FROM published_ne
 
 - `/itsec cve <CVE-ID>`
 - `/itsec latest [count]`
-- `/itsec search <term>`
-- `/itsec watch <vendor>`
-- `/itsec unwatch <vendor>`
-- `/itsec mysubs`
-- `/itsec weekly`
-- `/itsec status` (includes feed health summary for the last 24h)
+- `/itsec status`
 - `/itsec_help`
 - `/news_latest`
 
@@ -220,7 +210,7 @@ Managed categories:
 
 Managed channels:
 
-- `ITSEC ALERTS`: `cve-critical`, `cve-high`, `weekly-summary`
+- `ITSEC ALERTS`: `cve-critical`, `cve-high`
 - `ITSEC NEWS`: `security-news`, `cert-se-alerts` (if `ENABLE_CERT_SE=true`)
 - `ITSEC VENDORS`: `vendor-microsoft`, `vendor-linux`, `vendor-google`, `vendor-apple`, `vendor-cisco`, `vendor-fortinet`, `vendor-vmware`, `vendor-oracle`, `vendor-adobe`, `vendor-apache`, `vendor-nginx`, `vendor-openssl`, `vendor-docker`, `vendor-kubernetes`, `vendor-postgresql`, `vendor-mysql`
 - `ITSEC BOT`: `ask-itsec`, `itsec-log`
@@ -273,19 +263,9 @@ Configured RSS/Atom feeds:
 - `https://www.cisa.gov/cybersecurity-advisories/all.xml`
 - `https://isc.sans.edu/rssfeed.xml`
 - `https://googleprojectzero.blogspot.com/feeds/posts/default?alt=rss`
-- `https://security.googleblog.com/atom.xml`
 - `https://msrc.microsoft.com/blog/feed`
 - `https://www.rapid7.com/blog/rss/`
-- `https://blog.talosintelligence.com/rss/`
-- `https://unit42.paloaltonetworks.com/feed/`
-- `https://www.schneier.com/feed/atom/`
 - `https://www.cert.se/feed/` (only when `ENABLE_CERT_SE=true`)
-
-Weekly summary fields:
-
-- `Active exploits (KEV-linked)`: CVEs in the last 7 days where exploit status is `Active`/`aktiv`
-- `Public PoCs observed`: CVEs in the last 7 days where exploit status is `PoC`
-- `KEV-tagged CVEs (local feed)`: CVEs in the local DB from the last 7 days tagged with CISA KEV
 
 ## Security Notes
 
@@ -294,13 +274,6 @@ Weekly summary fields:
 - Use `.env.example` as a template with placeholders.
 
 ## Troubleshooting
-
-- Too many older CVE IDs (for example many `CVE-2025-*`) in alerts
-  - Lower `CVE_MAX_PUBLISHED_AGE_DAYS` in `.env` (for example `14`) and restart the bot.
-
-- Too many old or noisy news items
-  - Lower `NEWS_MAX_PUBLISHED_AGE_HOURS` in `.env` (for example `24`) and keep `NEWS_INCLUDE_UNDATED_ENTRIES=false`.
-  - Restart the bot after changing `.env`.
 
 - `TypeError: can't subtract offset-naive and offset-aware datetimes`
   - Pull latest code and restart the service.

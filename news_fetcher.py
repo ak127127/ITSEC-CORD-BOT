@@ -10,7 +10,7 @@ from typing import Any
 
 import feedparser
 
-from config import NEWS_FEEDS, _env_bool, get_int_setting
+from config import NEWS_FEEDS
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 class NewsFetcher:
     def __init__(self):
         self.feeds = NEWS_FEEDS
-        self.max_published_age_hours = max(1, get_int_setting("NEWS_MAX_PUBLISHED_AGE_HOURS", 36))
-        self.include_undated_entries = _env_bool("NEWS_INCLUDE_UNDATED_ENTRIES", False)
         self.last_feed_reports: list[dict[str, Any]] = []
 
     @staticmethod
@@ -85,8 +83,7 @@ class NewsFetcher:
         """Fetch news from RSS feeds."""
         collected: list[dict[str, str]] = []
         feed_reports: list[dict[str, Any]] = []
-        max_age_hours = min(max(1, hours), self.max_published_age_hours)
-        cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=max_age_hours)
+        cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=hours)
 
         for feed_url in self.feeds:
             try:
@@ -127,10 +124,8 @@ class NewsFetcher:
                         if published < cutoff:
                             continue
                     except ValueError:
-                        continue
-                elif not self.include_undated_entries:
-                    continue
-                elif not self._is_recent(published_iso, max_age_hours):
+                        pass
+                elif not self._is_recent(published_iso, hours):
                     continue
 
                 title = getattr(entry, "title", "Untitled")
