@@ -278,6 +278,9 @@ Configured RSS/Atom feeds:
 - `TypeError: can't subtract offset-naive and offset-aware datetimes`
   - Pull latest code and restart the service.
 
+- `Why did a CVE with CVSS 6.5 appear in cve-critical?`
+  - This is expected when `CISA KEV: Yes` (or exploit status is active). Channel routing prioritizes exploitability and KEV status, while the emoji/severity display still reflects CVSS score.
+
 - `Privileged message content intent is missing`
   - Safe to ignore for slash-command-only usage.
 
